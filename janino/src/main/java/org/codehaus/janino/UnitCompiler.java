@@ -13247,6 +13247,19 @@ class UnitCompiler {
         return this.getCodeContext().getClassFile().addConstantInterfaceMethodrefInfo(iClass.getDescriptor(), methodName, methodFd);
     }
 
+    private static final String classLambdaMetafactory = "Ljava/lang/invoke/LambdaMetafactory;";
+    private static final String methodMetafactory = "metafactory";
+    private static final String metafactoryFd = "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;";
+    /**
+     * Add a bootstrap method which static argument list describes the sole method of the functional
+     * interface and the desugared implementation method, and returns an object (the lambda object) that
+     * implements the target type.
+     * <a href="https://docs.oracle.com/javase/8/docs/api/java/lang/invoke/LambdaMetafactory.html">See here.</a>
+     */
+    public void lambdaBootstrap(short soleMethodType,short bootstrapMethodHandle,short lambdaObjectType){
+        // TODO
+    }
+
 /* UNUSED
     private void writeConstantIntegerInfo(int value) {
         this.getCodeContext().writeShort(-1, this.addConstantIntegerInfo(value));

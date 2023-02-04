@@ -398,6 +398,13 @@ class ClassFile implements Annotatable {
     }
 
     /**
+     * Adds a "CONSTANT_MethodHandle_info" structure to the class file.
+     */
+    public short addConstantMethodHandleInfo(byte referenceKind,short referenceIndex){
+        return this.addToConstantPool(new ConstantMethodHandleInfo(referenceKind,referenceIndex));
+    }
+
+    /**
      * Adds a "CONSTANT_InterfaceMethodref_info" structure to the class file.
      *
      * @see <a href="http://java.sun.com/docs/books/vmspec/2nd-edition/html/ClassFile.doc.html#42041">JVM specification,
@@ -1599,6 +1606,17 @@ class ClassFile implements Annotatable {
     /**
      * See JVMS7 4.4.8.
      */
+
+    public static final byte
+            REF_getField = 1,
+            REF_getStatic = 2,
+            REF_putField = 3,
+            REF_putStatic = 4,
+            REF_invokeVirtual = 5,
+            REF_invokeStatic = 6,
+            REF_invokeSpecial = 7,
+            REF_newInvokeSpecial = 8,
+            REF_invokeInterface = 9;
     public static
     class ConstantMethodHandleInfo extends ConstantPoolInfo {
 
@@ -2623,6 +2641,55 @@ class ClassFile implements Annotatable {
             }
         }
     }
+
+
+    private void addBootstrapMethod(BootstrapMethod bootstrapMethod){
+        if(bootstrapMethodsAttribute == null)
+            bootstrapMethodsAttribute = new BootstrapMethodsAttribute(
+                    ClassFile.this.addConstantUtf8Info("BootstrapMethods"));
+
+        bootstrapMethodsAttribute.addBootstrapMethods(bootstrapMethod);
+    }
+
+    private BootstrapMethodsAttribute bootstrapMethodsAttribute;
+    public static
+    class BootstrapMethodsAttribute extends AttributeInfo{
+        private final List<BootstrapMethod> bootstrapMethods = new ArrayList<>();
+
+        public BootstrapMethodsAttribute(short nameIndex) {
+            super(nameIndex);
+        }
+
+        public void addBootstrapMethods(BootstrapMethod bootstrapMethod){
+            bootstrapMethods.add(bootstrapMethod);
+        }
+
+        @Override
+        protected void storeBody(DataOutputStream dos) throws IOException {
+            dos.writeShort(bootstrapMethods.size());
+            for(BootstrapMethod bm : bootstrapMethods)
+                bm.store(dos);
+        }
+    }
+
+    public static
+    class BootstrapMethod{
+        private final short bootstrapMethodRef;
+        private final short[] bootstrapArguments;
+
+        public BootstrapMethod(short bootstrapMethodRef,short... bootstrapArguments){
+            this.bootstrapMethodRef = bootstrapMethodRef;
+            this.bootstrapArguments = bootstrapArguments;
+        }
+
+        public void store(DataOutputStream dos) throws IOException {
+            dos.writeShort(bootstrapMethodRef);
+            dos.writeShort(bootstrapArguments.length);
+            for(Short arg : bootstrapArguments)
+                dos.writeShort(arg);
+        }
+    }
+
 
     /**
      * Representation of an unmodifiable {@code StackMapTable} attribute, as read from a class file.
