@@ -25,10 +25,7 @@
 
 package org.codehaus.janino;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
 import java.util.logging.Logger;
 
@@ -65,7 +62,7 @@ import org.codehaus.janino.util.signature.SignatureParser.TypeVariableSignature;
  * A wrapper object that turns a {@link ClassFile} object into an {@link IClass}.
  */
 public
-class ClassFileIClass extends IClass {
+class ClassFileIClass extends CachedIClass {
 
     private static final Logger LOGGER = Logger.getLogger(ClassFileIClass.class.getName());
 
@@ -127,20 +124,12 @@ class ClassFileIClass extends IClass {
         ITypeVariable[] result = new ITypeVariable[cs.formalTypeParameters.size()];
         for (int i = 0; i < result.length; i++) {
             final FormalTypeParameter     ftp    = (FormalTypeParameter) cs.formalTypeParameters.get(i);
-            final ITypeVariableOrIClass[] bounds = ClassFileIClass.this.getBounds(ftp);
-            result[i] = new ITypeVariable() {
-
-                @Override public String
-                getName() { return ftp.identifier; }
-
-                @Override public ITypeVariableOrIClass[]
-                getBounds() { return bounds; }
-
+            final List<IClass> bounds = ClassFileIClass.this.getBounds(ftp);
+            result[i] = new ITypeVariable(ftp.identifier,this,bounds) {
                 @Override public String
                 toString() {
-                    ITypeVariableOrIClass[] bs = this.getBounds();
-                    String                  s  = this.getName() + " extends " + bs[0];
-                    for (int i = 1; i < bs.length; i++) s += " & " + bs[i];
+                    String                  s  = name + " extends " + bounds.get(0);
+                    for (int i = 1; i < bounds.size(); i++) s += " & " + bounds.get(i);
                     return s;
                 }
             };
@@ -149,25 +138,25 @@ class ClassFileIClass extends IClass {
         return result;
     }
 
-    private ITypeVariableOrIClass[]
+    private List<IClass>
     getBounds(SignatureParser.FormalTypeParameter ftp) throws CompileException {
-        List<ITypeVariableOrIClass> result = new ArrayList<>();
+        List<IClass> result = new ArrayList<>();
         if (ftp.classBound != null) {
-            result.add(this.fieldTypeSignatureToITypeVariableOrIClass(ftp.classBound));
+            result.add(this.fieldTypeSignatureToIClass(ftp.classBound));
         }
-        return (ITypeVariableOrIClass[]) result.toArray(new ITypeVariableOrIClass[result.size()]);
+        return result;
     }
 
-    private ITypeVariableOrIClass
-    fieldTypeSignatureToITypeVariableOrIClass(FieldTypeSignature fts) throws CompileException {
+    private IClass
+    fieldTypeSignatureToIClass(FieldTypeSignature fts) throws CompileException {
 
-        return (ITypeVariableOrIClass) fts.accept(
-            new FieldTypeSignatureVisitor<ITypeVariableOrIClass, CompileException>() {
+        return (IClass) fts.accept(
+            new FieldTypeSignatureVisitor<IClass, CompileException>() {
 
-                @Override public ITypeVariableOrIClass
+                @Override public IClass
                 visitArrayTypeSignature(ArrayTypeSignature ats) { throw new AssertionError(ats); }
 
-                @Override public ITypeVariableOrIClass
+                @Override public IClass
                 visitClassTypeSignature(ClassTypeSignature cts) throws CompileException {
                     String fd = Descriptor.fromClassName(cts.packageSpecifier + cts.simpleClassName);
                     IClass result;
@@ -182,24 +171,17 @@ class ClassFileIClass extends IClass {
                     return result;
                 }
 
-                @Override public ITypeVariableOrIClass
+                @Override public IClass
                 visitTypeVariableSignature(final TypeVariableSignature tvs) {
-                    return new ITypeVariable() {
-
-                        @Override public String
-                        getName() { return tvs.identifier; }
-
-                        @Override public ITypeVariableOrIClass[]
-                        getBounds() { throw new AssertionError(this); }
-                    };
+                    return new ITypeVariable(tvs.identifier,ClassFileIClass.this);
                 }
             }
         );
     }
 
-    @Override protected IConstructor[]
+    @Override protected List<IConstructor>
     getDeclaredIConstructors2() {
-        List<IInvocable> iConstructors = new ArrayList<>();
+        List<IConstructor> iConstructors = new ArrayList<>();
 
         for (ClassFile.MethodInfo mi : this.classFile.methodInfos) {
             IInvocable ii;
@@ -208,13 +190,13 @@ class ClassFileIClass extends IClass {
             } catch (ClassNotFoundException ex) {
                 throw new InternalCompilerException(ex.getMessage(), ex);
             }
-            if (ii instanceof IConstructor) iConstructors.add(ii);
+            if (ii instanceof IConstructor) iConstructors.add((IConstructor) ii);
         }
 
-        return (IConstructor[]) iConstructors.toArray(new IConstructor[iConstructors.size()]);
+        return iConstructors;
     }
 
-    @Override protected IMethod[]
+    @Override protected List<IMethod>
     getDeclaredIMethods2() {
         List<IMethod> iMethods = new ArrayList<>();
 
@@ -233,15 +215,15 @@ class ClassFileIClass extends IClass {
             if (ii instanceof IMethod) iMethods.add((IMethod) ii);
         }
 
-        return (IMethod[]) iMethods.toArray(new IMethod[iMethods.size()]);
+        return iMethods;
     }
 
-    @Override protected IField[]
+    @Override protected List<IField>
     getDeclaredIFields2() {
-        IField[] ifs = new IClass.IField[this.classFile.fieldInfos.size()];
+        List<IField> ifs = new ArrayList<>();
         for (int i = 0; i < this.classFile.fieldInfos.size(); ++i) {
             try {
-                ifs[i] = this.resolveField((ClassFile.FieldInfo) this.classFile.fieldInfos.get(i));
+                ifs.add(this.resolveField((ClassFile.FieldInfo) this.classFile.fieldInfos.get(i)));
             } catch (ClassNotFoundException ex) {
                 throw new InternalCompilerException(ex.getMessage(), ex);
             }
@@ -249,10 +231,10 @@ class ClassFileIClass extends IClass {
         return ifs;
     }
 
-    @Override protected IClass[]
+    @Override protected List<IClass>
     getDeclaredIClasses2() throws CompileException {
         ClassFile.InnerClassesAttribute ica = this.classFile.getInnerClassesAttribute();
-        if (ica == null) return new IClass[0];
+        if (ica == null) return Collections.emptyList();
 
         List<IClass> res = new ArrayList<>();
         for (ClassFile.InnerClassesAttribute.Entry e : ica.getEntries()) {
@@ -264,7 +246,7 @@ class ClassFileIClass extends IClass {
                 }
             }
         }
-        return (IClass[]) res.toArray(new IClass[res.size()]);
+        return res;
     }
 
     @Override @Nullable protected IClass
@@ -330,7 +312,7 @@ class ClassFileIClass extends IClass {
     @Override public boolean
     isFinal() { return Mod.isFinal(this.accessFlags); }
 
-    @Override protected IClass[]
+    @Override protected List<IClass>
     getInterfaces2() throws CompileException { return this.resolveClasses(this.classFile.interfaces); }
 
     @Override public boolean
@@ -538,12 +520,12 @@ class ClassFileIClass extends IClass {
     }
     private final Map<String /*descriptor*/, IClass> resolvedClasses = new HashMap<>();
 
-    private IClass[]
+    private List<IClass>
     resolveClasses(short[] ifs) throws CompileException {
-        IClass[] result = new IClass[ifs.length];
-        for (int i = 0; i < result.length; ++i) {
+        List<IClass> result = new ArrayList<>();
+        for (short anIf : ifs) {
             try {
-                result[i] = this.resolveClass(ifs[i]);
+                result.add(this.resolveClass(anIf));
             } catch (ClassNotFoundException e) {
                 throw new CompileException(e.getMessage(), null); // SUPPRESS CHECKSTYLE AvoidHidingCause
             }
@@ -572,22 +554,22 @@ class ClassFileIClass extends IClass {
         final IClass returnType = this.resolveClass(md.returnFd);
 
         // Determine parameter types.
-        final IClass[] parameterTypes = new IClass[md.parameterFds.length];
-        for (int i = 0; i < parameterTypes.length; ++i) parameterTypes[i] = this.resolveClass(md.parameterFds[i]);
+        final List<IClass> parameterTypes = new ArrayList<>();
+        for (String pfd : md.parameterFds) parameterTypes.add(this.resolveClass(pfd));
 
         // Determine thrown exceptions.
-        IClass[]                  tes = null;
+        List<IClass>                  tes = null;
         ClassFile.AttributeInfo[] ais = methodInfo.getAttributes();
         for (ClassFile.AttributeInfo ai : ais) {
             if (ai instanceof ClassFile.ExceptionsAttribute) {
                 ConstantClassInfo[] ccis = ((ClassFile.ExceptionsAttribute) ai).getExceptions(this.classFile);
-                tes = new IClass[ccis.length];
-                for (int i = 0; i < tes.length; ++i) {
-                    tes[i] = this.resolveClass(Descriptor.fromInternalForm(ccis[i].getName(this.classFile)));
+                tes = new ArrayList<>();
+                for (ConstantClassInfo cci : ccis) {
+                    tes.add(this.resolveClass(Descriptor.fromInternalForm(cci.getName(this.classFile))));
                 }
             }
         }
-        final IClass[] thrownExceptions = tes == null ? new IClass[0] : tes;
+        final List<IClass> thrownExceptions = tes == null ? Collections.emptyList() : tes;
 
         // Determine access.
         final Access access = ClassFileIClass.accessFlags2Access(methodInfo.getAccessFlags());
@@ -605,33 +587,35 @@ class ClassFileIClass extends IClass {
                 @Override public boolean
                 isVarargs() { return Mod.isVarargs(methodInfo.getAccessFlags()); }
 
-                @Override public IClass[]
+                @Override public List<IClass>
                 getParameterTypes2() throws CompileException {
 
                     // Process magic first parameter of inner class constructor.
                     IClass outerIClass = ClassFileIClass.this.getOuterIClass();
                     if (outerIClass != null) {
-                        if (parameterTypes.length < 1) {
+                        if (parameterTypes.size() < 1) {
                             throw new InternalCompilerException("Inner class constructor lacks magic first parameter");
                         }
-                        if (parameterTypes[0] != outerIClass) {
+                        if (parameterTypes.get(0) != outerIClass) {
                             throw new InternalCompilerException(
                                 "Magic first parameter of inner class constructor has type \""
-                                + parameterTypes[0].toString()
+                                + parameterTypes.get(0).toString()
                                 + "\" instead of that of its enclosing instance (\""
                                 + outerIClass.toString()
                                 + "\")"
                             );
                         }
-                        IClass[] tmp = new IClass[parameterTypes.length - 1];
-                        System.arraycopy(parameterTypes, 1, tmp, 0, tmp.length);
+                        List<IClass> tmp = new ArrayList<>();
+                        for(int i=1;i<parameterTypes.size();i++){
+                            tmp.add(parameterTypes.get(i));
+                        }
                         return tmp;
                     }
 
                     return parameterTypes;
                 }
 
-                @Override public IClass[]      getThrownExceptions2() { return thrownExceptions; }
+                @Override public List<IClass>      getThrownExceptions2() { return thrownExceptions; }
                 @Override public Access        getAccess()            { return access;           }
                 @Override public IAnnotation[] getAnnotations()       { return iAnnotations;     }
             };
@@ -644,9 +628,9 @@ class ClassFileIClass extends IClass {
                 @Override public boolean       isAbstract()           { return Mod.isAbstract(methodInfo.getAccessFlags()); }
                 @Override public IClass        getReturnType()        { return returnType;                                  }
                 @Override public String        getName()              { return name;                                        }
-                @Override public IClass[]      getParameterTypes2()   { return parameterTypes;                              }
+                @Override public List<IClass>      getParameterTypes2()   { return parameterTypes;                              }
                 @Override public boolean       isVarargs()            { return Mod.isVarargs(methodInfo.getAccessFlags());  }
-                @Override public IClass[]      getThrownExceptions2() { return thrownExceptions;                            }
+                @Override public List<IClass>      getThrownExceptions2() { return thrownExceptions;                            }
             };
         }
         this.resolvedMethods.put(methodInfo, result);

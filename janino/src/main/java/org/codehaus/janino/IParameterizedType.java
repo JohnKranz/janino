@@ -26,8 +26,8 @@
 package org.codehaus.janino;
 
 public
-interface IParameterizedType extends IType {
+abstract class IParameterizedType extends IClass {
 
-    IType[] getActualTypeArguments();
-    IType   getRawType();
+    abstract IClass[] getActualTypeArguments();
+    abstract IClass   getRawType();
 }

@@ -1061,7 +1061,7 @@ class Java {
          * </dl>
          * <p>
          *   Notice that these fields are not included in the {@link IClass.IField} array returned by {@link
-         *   IClass#getDeclaredIFields2()}.
+         *   IClass#getDeclaredIFields()} ()}.
          * </p>
          * <p>
          *   If a synthetic field with the same name exists already, then it must have the same type and the
@@ -1148,7 +1148,8 @@ class Java {
         public void
         invalidateMethodCaches() {
             if (this.resolvedType != null) {
-                this.resolvedType.invalidateMethodCaches();
+                if(this.resolvedType instanceof CachedIClass)
+                    ((CachedIClass) this.resolvedType).invalidateMethodCaches();
             }
         }
 
@@ -1293,7 +1294,10 @@ class Java {
             fdoi.setDeclaringType(this);
 
             // Clear resolved type cache.
-            if (this.resolvedType != null) this.resolvedType.clearIFieldCaches();
+            if (this.resolvedType != null){
+                if(this.resolvedType instanceof CachedIClass)
+                    ((CachedIClass) this.resolvedType).clearIFieldCaches();
+            }
         }
 
         // Compile time members.
@@ -1861,7 +1865,10 @@ class Java {
             fd.setDeclaringType(this);
 
             // Clear resolved type cache.
-            if (this.resolvedType != null) this.resolvedType.clearIFieldCaches();
+            if (this.resolvedType != null){
+                if(this.resolvedType instanceof CachedIClass)
+                    ((CachedIClass) this.resolvedType).clearIFieldCaches();
+            }
         }
 
         /**
@@ -1877,7 +1884,7 @@ class Java {
         /**
          * Set during "compile()".
          */
-        @Nullable IType[] interfaces;
+        @Nullable IClass[] interfaces;
 
         // Implement NamedTypeDeclaration.
 
@@ -2398,7 +2405,7 @@ class Java {
         /**
          * Set by "compile()".
          */
-        @Nullable IType returnType;
+        @Nullable IClass returnType;
 
         // Implement DocCommentable.
 
@@ -4154,14 +4161,14 @@ class Java {
     class SimpleType extends Type {
 
         /**
-         * The {@link IType} represented by this {@link Type}.
+         * The {@link IClass} represented by this {@link Type}.
          */
-        public final IType iType;
+        public final IClass iClass;
 
         public
-        SimpleType(Location location, IType iType) {
+        SimpleType(Location location, IClass iClass) {
             super(location);
-            this.iType = iType;
+            this.iClass = iClass;
         }
 
         @Override public void
@@ -4171,7 +4178,7 @@ class Java {
         getEnclosingScope() { throw new AssertionError(); }
 
         @Override public String
-        toString() { return this.iType.toString(); }
+        toString() { return this.iClass.toString(); }
 
         @Override @Nullable public <R, EX extends Throwable> R
         accept(AtomVisitor<R, EX> visitor) throws EX { return visitor.visitType(this); }
@@ -4783,7 +4790,7 @@ class Java {
         /**
          * The resolved {@link #qualification}.
          */
-        @Nullable IType targetIType;
+        @Nullable IClass targetIClass;
 
         // Implement "Atom".
 
@@ -5548,15 +5555,15 @@ class Java {
         /**
          * The resolved {@link #type}.
          */
-        @Nullable public IType iType;
+        @Nullable public IClass iClass;
 
         public
-        NewClassInstance(Location location, @Nullable Rvalue qualification, IType iType, Rvalue[] arguments) {
+        NewClassInstance(Location location, @Nullable Rvalue qualification, IClass iClass, Rvalue[] arguments) {
             super(location);
             this.qualification = qualification;
             this.type          = null;
             this.arguments     = arguments;
-            this.iType         = iType;
+            this.iClass         = iClass;
         }
 
         // Implement "Atom".
@@ -5569,8 +5576,8 @@ class Java {
             if (this.type != null) {
                 sb.append(this.type.toString());
             } else
-            if (this.iType != null) {
-                sb.append(this.iType.toString());
+            if (this.iClass != null) {
+                sb.append(this.iClass.toString());
             } else {
                 sb.append("???");
             }
@@ -6258,14 +6265,14 @@ class Java {
 
         private short                 slotIndex = -1;
         @Nullable private String      name;
-        @Nullable private final IType type;
+        @Nullable private final IClass type;
         @Nullable private Offset      start, end;
 
         /**
          * @param slotNumber (two slots for LONG and DOUBLE local variables)
          */
         public
-        LocalVariableSlot(@Nullable String name, short slotNumber, @Nullable IType type) {
+        LocalVariableSlot(@Nullable String name, short slotNumber, @Nullable IClass type) {
             this.name      = name;
             this.slotIndex = slotNumber;
             this.type      = type;
@@ -6335,7 +6342,7 @@ class Java {
         /**
          * @return the resolved type of this local variable
          */
-        public IType getType() { assert this.type != null; return this.type; }
+        public IClass getType() { assert this.type != null; return this.type; }
     }
 
     /**
@@ -6352,7 +6359,7 @@ class Java {
         /**
          * The type of this local variable.
          */
-        public final IType type;
+        public final IClass type;
 
         /**
          * The slot reserved for this local variable.
@@ -6360,7 +6367,7 @@ class Java {
         @Nullable public LocalVariableSlot slot;
 
         public
-        LocalVariable(boolean finaL, IType type) {
+        LocalVariable(boolean finaL, IClass type) {
             this.finaL = finaL;
             this.type  = type;
         }

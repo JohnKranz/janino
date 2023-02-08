@@ -27,18 +27,12 @@ package org.codehaus.janino;
 
 import java.io.Serializable;
 import java.lang.reflect.Constructor;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import org.codehaus.commons.compiler.CompileException;
+import org.codehaus.commons.compiler.InternalCompilerException;
 import org.codehaus.commons.nullanalysis.Nullable;
 
 /**
@@ -49,7 +43,7 @@ import org.codehaus.commons.nullanalysis.Nullable;
  * </p>
  */
 public abstract
-class IClass implements ITypeVariableOrIClass {
+class IClass {
 
     private static final Logger LOGGER = Logger.getLogger(IClass.class.getName());
 
@@ -65,17 +59,18 @@ class IClass implements ITypeVariableOrIClass {
      * The {@link IClass} of the {@code null} literal.
      */
     public static final IClass NULL = new IClass() {
-        @Override protected ITypeVariable[]  getITypeVariables2()        { return new ITypeVariable[0]; }
-        @Override @Nullable protected IClass getComponentType2()         { return null;                 }
-        @Override protected IClass[]         getDeclaredIClasses2()      { return new IClass[0];        }
-        @Override protected IConstructor[]   getDeclaredIConstructors2() { return new IConstructor[0];  }
-        @Override protected IField[]         getDeclaredIFields2()       { return new IField[0];        }
-        @Override protected IMethod[]        getDeclaredIMethods2()      { return new IMethod[0];       }
-        @Override @Nullable protected IClass getDeclaringIClass2()       { return null;                 }
-        @Override protected String           getDescriptor2()            { return "";                   }
-        @Override protected IClass[]         getInterfaces2()            { return new IClass[0];        }
-        @Override @Nullable protected IClass getOuterIClass2()           { return null;                 }
-        @Override @Nullable protected IClass getSuperclass2()            { return null;                 }
+        @Override public ITypeVariable[]  getITypeVariables()        { return new ITypeVariable[0]; }
+        @Override @Nullable public IClass getComponentType()         { return null;                 }
+        @Override public IAnnotation[] getIAnnotations() throws CompileException {return IClass.NO_ANNOTATIONS;}
+        @Override public List<IClass>         getDeclaredIClasses()      { return Collections.emptyList();        }
+        @Override public List<IConstructor>   getDeclaredIConstructors() { return Collections.emptyList();  }
+        @Override public List<IField>         getDeclaredIFields()       { return Collections.emptyList();        }
+        @Override public List<IMethod>        getDeclaredIMethods()      { return Collections.emptyList();       }
+        @Override @Nullable public IClass getDeclaringIClass()       { return null;                 }
+        @Override public String           getDescriptor()            { return "";                   }
+        @Override public List<IClass>         getInterfaces()            { return Collections.emptyList();        }
+        @Override @Nullable public IClass getOuterIClass()           { return null;                 }
+        @Override @Nullable public IClass getSuperclass()            { return null;                 }
         @Override public boolean             isAbstract()                { return false;                }
         @Override public boolean             isArray()                   { return false;                }
         @Override public boolean             isFinal()                   { return true;                 }
@@ -138,17 +133,20 @@ class IClass implements ITypeVariableOrIClass {
 
         PrimitiveIClass(String fieldDescriptor) { this.fieldDescriptor = fieldDescriptor; }
 
-        @Override protected ITypeVariable[]  getITypeVariables2()        { return new ITypeVariable[0]; }
-        @Override @Nullable protected IClass getComponentType2()         { return null;                 }
-        @Override protected IClass[]         getDeclaredIClasses2()      { return new IClass[0];        }
-        @Override protected IConstructor[]   getDeclaredIConstructors2() { return new IConstructor[0];  }
-        @Override protected IField[]         getDeclaredIFields2()       { return new IField[0];        }
-        @Override protected IMethod[]        getDeclaredIMethods2()      { return new IMethod[0];       }
-        @Override @Nullable protected IClass getDeclaringIClass2()       { return null;                 }
-        @Override protected String           getDescriptor2()            { return this.fieldDescriptor; }
-        @Override protected IClass[]         getInterfaces2()            { return new IClass[0];        }
-        @Override @Nullable protected IClass getOuterIClass2()           { return null;                 }
-        @Override @Nullable protected IClass getSuperclass2()            { return null;                 }
+        @Override public ITypeVariable[]  getITypeVariables()        { return new ITypeVariable[0]; }
+        @Override @Nullable public IClass getComponentType()         { return null;                 }
+
+        @Override public IAnnotation[] getIAnnotations() throws CompileException {return IClass.NO_ANNOTATIONS;}
+
+        @Override public List<IClass>         getDeclaredIClasses()      { return Collections.emptyList();        }
+        @Override public List<IConstructor>   getDeclaredIConstructors() { return Collections.emptyList();  }
+        @Override public List<IField>         getDeclaredIFields()       { return Collections.emptyList();        }
+        @Override public List<IMethod>        getDeclaredIMethods()      { return Collections.emptyList();       }
+        @Override @Nullable public IClass getDeclaringIClass()       { return null;                 }
+        @Override public String           getDescriptor()            { return this.fieldDescriptor; }
+        @Override public List<IClass>         getInterfaces()            { return Collections.emptyList();        }
+        @Override @Nullable public IClass getOuterIClass()           { return null;                 }
+        @Override @Nullable public IClass getSuperclass()            { return null;                 }
         @Override public boolean             isAbstract()                { return false;                }
         @Override public boolean             isArray()                   { return false;                }
         @Override public boolean             isFinal()                   { return true;                 }
@@ -164,37 +162,31 @@ class IClass implements ITypeVariableOrIClass {
     /**
      * @return Zero-length array if this {@link IClass} declares no type variables
      */
-    public final ITypeVariable[]
-    getITypeVariables() throws CompileException {
-        if (this.iTypeVariablesCache != null) return this.iTypeVariablesCache;
-        return (this.iTypeVariablesCache = this.getITypeVariables2());
+    public abstract ITypeVariable[]
+    getITypeVariables() throws CompileException;
+
+    public ITypeVariable resolveGeneric(String name) throws CompileException {
+        for(ITypeVariable itv : getITypeVariables()){
+            if(itv.getName().equals(name))
+                return itv;
+        }
+        if(getDeclaringIClass() == null)
+            throw new CompileException("Generic type " + name + "not found.",null);
+        return getDeclaringIClass().resolveGeneric(name);
     }
-    @Nullable private ITypeVariable[] iTypeVariablesCache;
+
+
+    public IClass getParameterizedType(ITypeVariable itv){return itv;}
 
     /**
-     * The uncached version of {@link #getDeclaredIConstructors()} which must be implemented by derived classes.
-     */
-    protected abstract ITypeVariable[] getITypeVariables2() throws CompileException;
-
-    /**
-     * Returns all the constructors declared by the class represented by the type. If the class has a default
-     * constructor, it is included.
+     * Returns the superclass of the class.
      * <p>
-     *   Returns an array with zero elements for an interface, array, primitive type or {@code void}.
+     *   Returns {@code null} for class {@link Object}, interfaces, arrays, primitive types and {@code void}.
      * </p>
      */
-    public final IConstructor[]
-    getDeclaredIConstructors() {
-        if (this.declaredIConstructorsCache != null) return this.declaredIConstructorsCache;
+    @Nullable public abstract IClass
+    getSuperclass() throws CompileException;
 
-        return (this.declaredIConstructorsCache = this.getDeclaredIConstructors2());
-    }
-    @Nullable private IConstructor[] declaredIConstructorsCache;
-
-    /**
-     * The uncached version of {@link #getDeclaredIConstructors()} which must be implemented by derived classes.
-     */
-    protected abstract IConstructor[] getDeclaredIConstructors2();
 
     /**
      * Returns the methods of the class or interface (but not inherited methods). For covariant methods, only the
@@ -203,88 +195,37 @@ class IClass implements ITypeVariableOrIClass {
      *   Returns an empty array for an array, primitive type or {@code void}.
      * </p>
      */
-    public final IMethod[]
-    getDeclaredIMethods() {
-        if (this.declaredIMethodsCache != null) return this.declaredIMethodsCache;
-        return (this.declaredIMethodsCache = this.getDeclaredIMethods2());
-    }
-    @Nullable private IMethod[] declaredIMethodsCache;
+    public abstract List<IMethod>
+    getDeclaredIMethods();
 
-    /**
-     * The uncached version of {@link #getDeclaredIMethods()} which must be implemented by derived classes.
-     */
-    protected abstract IMethod[] getDeclaredIMethods2();
-
-    /**
-     * Returns all methods with the given name declared in the class or interface (but not inherited methods).
-     * <p>
-     *   Returns an empty array if no methods with that name are declared.
-     * </p>
-     *
-     * @return an array of {@link IMethod}s that must not be modified
-     */
-    public final IMethod[]
-    getDeclaredIMethods(String methodName) {
-        Map<String, Object> dimc = this.declaredIMethodCache;
-        if (dimc == null) {
-            IMethod[] dims = this.getDeclaredIMethods();
-
-            // Fill the map with "IMethod"s and "List<IMethod>"s.
-            dimc = new HashMap<>();
-            for (IMethod dim : dims) {
-                String  mn  = dim.getName();
-                Object  o   = dimc.get(mn);
-                if (o == null) {
-                    dimc.put(mn, dim);
-                } else
-                if (o instanceof IMethod) {
-                    List<IMethod> l = new ArrayList<>();
-                    l.add((IMethod) o);
-                    l.add(dim);
-                    dimc.put(mn, l);
-                } else {
-                    @SuppressWarnings("unchecked") List<IMethod> tmp = (List<IMethod>) o;
-                    tmp.add(dim);
-                }
-            }
-
-            // Convert "IMethod"s and "List"s to "IMethod[]"s.
-            for (Map.Entry<String, Object/*IMethod-or-List<IMethod>*/> me : dimc.entrySet()) {
-                Object v = me.getValue();
-                if (v instanceof IMethod) {
-                    me.setValue(new IMethod[] { (IMethod) v });
-                } else {
-                    @SuppressWarnings("unchecked") List<IMethod> l = (List<IMethod>) v;
-                    me.setValue(l.toArray(new IMethod[l.size()]));
-                }
-            }
-            this.declaredIMethodCache = dimc;
+    public List<IMethod> getDeclaredIMethods(String name){
+        List<IMethod> iMethods = new ArrayList<>();
+        for(IMethod method : getDeclaredIMethods()){
+            if(method.getName().equals(name))
+                iMethods.add(method);
         }
-
-        IMethod[] methods = (IMethod[]) dimc.get(methodName);
-        return methods == null ? IClass.NO_IMETHODS : methods;
+        return iMethods;
     }
-    @Nullable private Map<String /*methodName*/, Object /*IMethod-or-List<IMethod>*/> declaredIMethodCache;
 
     /**
      * Returns all methods declared in the class or interface, its superclasses and its superinterfaces.
      *
      * @return an array of {@link IMethod}s that must not be modified
      */
-    public final IMethod[]
+    public final List<IMethod>
     getIMethods() throws CompileException {
 
         if (this.iMethodCache != null) return this.iMethodCache;
 
         List<IMethod> iMethods = new ArrayList<>();
         this.getIMethods(iMethods);
-        return (this.iMethodCache = (IMethod[]) iMethods.toArray(new IMethod[iMethods.size()]));
+        return this.iMethodCache = iMethods;
     }
-    @Nullable private IMethod[] iMethodCache;
+    @Nullable private List<IMethod> iMethodCache;
 
     private void
     getIMethods(List<IMethod> result) throws CompileException {
-        IMethod[] ms = this.getDeclaredIMethods();
+        List<IMethod> ms = this.getDeclaredIMethods();
 
         SCAN_DECLARED_METHODS:
         for (IMethod candidate : ms) {
@@ -306,14 +247,14 @@ class IClass implements ITypeVariableOrIClass {
         for (IClass ii : this.getInterfaces()) ii.getIMethods(result);
     }
 
-    private static final IMethod[] NO_IMETHODS = new IMethod[0];
+    protected static final List<IMethod> NO_IMETHODS = Collections.emptyList();
 
     /**
      * @return Whether this {@link IClass} (or its superclass or the interfaces it implements) has an {@link IMethod}
      *         with the given name and parameter types
      */
     public final boolean
-    hasIMethod(String methodName, IClass[] parameterTypes) throws CompileException {
+    hasIMethod(String methodName, List<IClass> parameterTypes) throws CompileException {
         return this.findIMethod(methodName, parameterTypes) != null;
     }
 
@@ -322,12 +263,12 @@ class IClass implements ITypeVariableOrIClass {
      *         with the given name and parameter types, or {@code null} if an applicable method could not be found
      */
     @Nullable public final IMethod
-    findIMethod(String methodName, IClass[] parameterTypes) throws CompileException {
+    findIMethod(String methodName, List<IClass> parameterTypes) throws CompileException {
         {
             IMethod result = null;
             for (IMethod im : this.getDeclaredIMethods(methodName)) {
                 if (
-                    Arrays.equals(im.getParameterTypes(), parameterTypes)
+                        im.getParameterTypes().equals(parameterTypes)
                     && (result == null || result.getReturnType().isAssignableFrom(im.getReturnType()))
                 ) result = im;
             }
@@ -343,7 +284,7 @@ class IClass implements ITypeVariableOrIClass {
         }
 
         {
-            IClass[] interfaces = this.getInterfaces();
+            List<IClass> interfaces = this.getInterfaces();
             for (IClass interfacE : interfaces) {
                 IMethod result = interfacE.findIMethod(methodName, parameterTypes);
                 if (result != null) return result;
@@ -354,72 +295,61 @@ class IClass implements ITypeVariableOrIClass {
     }
 
     /**
+     * Returns all the constructors declared by the class represented by the type. If the class has a default
+     * constructor, it is included.
+     * <p>
+     *   Returns an array with zero elements for an interface, array, primitive type or {@code void}.
+     * </p>
+     */
+    public abstract List<IConstructor>
+    getDeclaredIConstructors();
+
+    /**
      * @return The {@link IConstructor} declared in this {@link IClass} with the given parameter types, or {@code null}
      *         if an applicable constructor could not be found
      */
     @Nullable public final IConstructor
-    findIConstructor(IClass[] parameterTypes) throws CompileException {
-        IConstructor[] ics = this.getDeclaredIConstructors();
+    findIConstructor(List<IClass> parameterTypes) throws CompileException {
+        List<IConstructor> ics = this.getDeclaredIConstructors();
         for (IConstructor ic : ics) {
-            if (Arrays.equals(ic.getParameterTypes(), parameterTypes)) return ic;
+            if (ic.getParameterTypes().equals(parameterTypes)) return ic;
         }
 
         return null;
     }
 
     /**
+     * Returns the interfaces implemented by the class, respectively the superinterfaces of the interface, respectively
+     * <code>{</code> {@link Cloneable}{@code ,} {@link Serializable} <code>}</code> for arrays.
+     * <p>
+     *   Returns an empty array for primitive types and {@code void}.
+     * </p>
+     */
+    public abstract List<IClass>
+    getInterfaces() throws CompileException;
+
+    /**
      * Returns the {@link IField}s declared in this {@link IClass} (but not inherited fields).
      *
      * @return An empty array for an array, primitive type or {@code void}
      */
-    public final IField[]
-    getDeclaredIFields() {
-        Collection<IField> allFields = this.getDeclaredIFieldsCache().values();
-        return (IField[]) allFields.toArray(new IField[allFields.size()]);
+    public abstract List<IField>
+    getDeclaredIFields();
+
+    public IField
+    getDeclaredIField(String name) {
+        for(IField field : this.getDeclaredIFields()){
+            if(field.getName().equals(name)) return field;
+        }
+        return null;
     }
-
-    /**
-     * @return {@code String fieldName => IField}
-     */
-    private Map<String /*fieldName*/, IField>
-    getDeclaredIFieldsCache() {
-        if (this.declaredIFieldsCache != null) return this.declaredIFieldsCache;
-
-        IField[] fields = this.getDeclaredIFields2();
-
-        Map<String /*fieldName*/, IField> m = new LinkedHashMap<>();
-        for (IField f : fields) m.put(f.getName(), f);
-        return (this.declaredIFieldsCache = m);
-    }
-
-    /**
-     * Returns the named {@link IField} declared in this {@link IClass} (does not work for inherited fields).
-     *
-     * @return {@code null} iff this {@link IClass} does not declare an {@link IField} with that name
-     */
-    @Nullable public final IField
-    getDeclaredIField(String name) { return (IField) this.getDeclaredIFieldsCache().get(name); }
-
-    /**
-     * Clears the cache of declared fields which this class maintains in order to minimize the invocations of {@link
-     * #getDeclaredIFields2()}.
-     */
-    protected void
-    clearIFieldCaches() { this.declaredIFieldsCache = null; }
-
-    @Nullable private Map<String /*fieldName*/, IField> declaredIFieldsCache;
-
-    /**
-     * Uncached version of {@link #getDeclaredIFields()}.
-     */
-    protected abstract IField[] getDeclaredIFields2();
 
     /**
      * @return The synthetic fields of an anonymous or local class, in the order in which they are passed to all
      *         constructors
      */
-    public IField[]
-    getSyntheticIFields() { return new IField[0]; }
+    public List<IField>
+    getSyntheticIFields() { return Collections.emptyList(); }
 
     /**
      * Returns the classes and interfaces declared as members of the class (but not inherited classes and interfaces).
@@ -427,37 +357,8 @@ class IClass implements ITypeVariableOrIClass {
      *   Returns an empty array for an array, primitive type or {@code void}.
      * </p>
      */
-    public final IClass[]
-    getDeclaredIClasses() throws CompileException {
-        if (this.declaredIClassesCache != null) return this.declaredIClassesCache;
-        return (this.declaredIClassesCache = this.getDeclaredIClasses2());
-    }
-    @Nullable private IClass[] declaredIClassesCache;
-
-    /**
-     * @return The member types of this type
-     */
-    protected abstract IClass[] getDeclaredIClasses2() throws CompileException;
-
-    /**
-     * @return If this class is a member class, the declaring class, otherwise {@code null}
-     */
-    @Nullable public final IClass
-    getDeclaringIClass() throws CompileException {
-        if (!this.declaringIClassIsCached) {
-            this.declaringIClassCache    = this.getDeclaringIClass2();
-            this.declaringIClassIsCached = true;
-        }
-        return this.declaringIClassCache;
-    }
-    private boolean          declaringIClassIsCached;
-    @Nullable private IClass declaringIClassCache;
-
-    /**
-     * @return If this class is a member class, the declaring class, otherwise {@code null}
-     */
-    @Nullable protected abstract IClass
-    getDeclaringIClass2() throws CompileException;
+    public abstract List<IClass>
+    getDeclaredIClasses() throws CompileException ;
 
     /**
      * The following types have an "outer class":
@@ -469,50 +370,8 @@ class IClass implements ITypeVariableOrIClass {
      *
      * @return The outer class of this type, or {@code null}
      */
-    @Nullable public final IClass
-    getOuterIClass() throws CompileException {
-        if (this.outerIClassIsCached) return this.outerIClassCache;
-
-        this.outerIClassIsCached = true;
-        return (this.outerIClassCache = this.getOuterIClass2());
-    }
-    private boolean          outerIClassIsCached;
-    @Nullable private IClass outerIClassCache;
-
-    /**
-     * @see #getOuterIClass()
-     */
-    @Nullable protected abstract IClass
-    getOuterIClass2() throws CompileException;
-
-    /**
-     * Returns the superclass of the class.
-     * <p>
-     *   Returns {@code null} for class {@link Object}, interfaces, arrays, primitive types and {@code void}.
-     * </p>
-     */
-    @Nullable public final IClass
-    getSuperclass() throws CompileException {
-        if (this.superclassIsCached) return this.superclassCache;
-
-        IClass sc = this.getSuperclass2();
-        if (sc != null && IClass.rawTypeOf(sc).isSubclassOf(this)) {
-            throw new CompileException(
-                "Class circularity detected for \"" + Descriptor.toClassName(this.getDescriptor()) + "\"",
-                null
-            );
-        }
-        this.superclassIsCached = true;
-        return (this.superclassCache = sc);
-    }
-    private boolean          superclassIsCached;
-    @Nullable private IClass superclassCache;
-
-    /**
-     * @see #getSuperclass()
-     */
-    @Nullable protected abstract IClass
-    getSuperclass2() throws CompileException;
+    @Nullable public abstract IClass
+    getOuterIClass() throws CompileException;
 
     /**
      * @return The accessibility of this type
@@ -527,33 +386,10 @@ class IClass implements ITypeVariableOrIClass {
     public abstract boolean isFinal();
 
     /**
-     * Returns the interfaces implemented by the class, respectively the superinterfaces of the interface, respectively
-     * <code>{</code> {@link Cloneable}{@code ,} {@link Serializable} <code>}</code> for arrays.
-     * <p>
-     *   Returns an empty array for primitive types and {@code void}.
-     * </p>
+     * @return If this class is a member class, the declaring class, otherwise {@code null}
      */
-    public final IClass[]
-    getInterfaces() throws CompileException {
-        if (this.interfacesCache != null) return this.interfacesCache;
-
-        IClass[] is = this.getInterfaces2();
-        for (IClass ii : is) {
-            if (ii.implementsInterface(this)) {
-                throw new CompileException(
-                    "Interface circularity detected for \"" + Descriptor.toClassName(this.getDescriptor()) + "\"",
-                    null
-                );
-            }
-        }
-        return (this.interfacesCache = is);
-    }
-    @Nullable private IClass[] interfacesCache;
-
-    /**
-     * @see #getInterfaces()
-     */
-    protected abstract IClass[] getInterfaces2() throws CompileException;
+    @Nullable public abstract IClass
+    getDeclaringIClass() throws CompileException;
 
     /**
      * Whether the class may be instantiated (JVMS 4.1 access_flags).
@@ -562,20 +398,8 @@ class IClass implements ITypeVariableOrIClass {
      */
     public abstract boolean isAbstract();
 
-    /**
-     * Returns the field descriptor for the type as defined by JVMS 4.3.2. This method is fast.
-     */
-    public final String
-    getDescriptor() {
-        if (this.descriptorCache != null) return this.descriptorCache;
-        return (this.descriptorCache = this.getDescriptor2());
-    }
-    @Nullable private String descriptorCache;
-
-    /**
-     * @return The field descriptor for the type as defined by JVMS 4.3.2.
-     */
-    protected abstract String getDescriptor2();
+    public abstract String
+    getDescriptor();
 
     /**
      * Convenience method that determines the field descriptors of an array of {@link IClass}es.
@@ -583,9 +407,9 @@ class IClass implements ITypeVariableOrIClass {
      * @see #getDescriptor()
      */
     public static String[]
-    getDescriptors(IClass[] iClasses) {
-        String[] descriptors = new String[iClasses.length];
-        for (int i = 0; i < iClasses.length; ++i) descriptors[i] = iClasses[i].getDescriptor();
+    getDescriptors(List<IClass> iClasses) {
+        String[] descriptors = new String[iClasses.size()];
+        for (int i = 0; i < iClasses.size(); ++i) descriptors[i] = iClasses.get(i).getDescriptor();
         return descriptors;
     }
 
@@ -619,22 +443,8 @@ class IClass implements ITypeVariableOrIClass {
      * @return The component type of the array, or {@code null} for classes, interfaces, primitive types and {@code
      *         void}
      */
-    @Nullable public final IClass
-    getComponentType() {
-        if (this.componentTypeIsCached) return this.componentTypeCache;
-
-        this.componentTypeCache    = this.getComponentType2();
-        this.componentTypeIsCached = true;
-        return this.componentTypeCache;
-    }
-    private boolean          componentTypeIsCached;
-    @Nullable private IClass componentTypeCache;
-
-    /**
-     * @see #getComponentType()
-     */
-    @Nullable protected abstract IClass
-    getComponentType2();
+    @Nullable public abstract IClass
+    getComponentType();
 
     @Override public String
     toString() {
@@ -757,7 +567,7 @@ class IClass implements ITypeVariableOrIClass {
     public boolean
     implementsInterface(IClass that) throws CompileException {
         for (IClass c = this; c != null; c = c.getSuperclass()) {
-            IClass[] tis = c.getInterfaces();
+            List<IClass> tis = c.getInterfaces();
             for (IClass ti : tis) {
                 if (ti == that || ti.implementsInterface(that)) return true;
             }
@@ -779,31 +589,31 @@ class IClass implements ITypeVariableOrIClass {
      *
      * @return an array of {@link IClass}es in unspecified order, possibly of length zero
      */
-    IClass[]
+    List<IClass>
     findMemberType(@Nullable String name) throws CompileException {
-        IClass[] res = (IClass[]) this.memberTypeCache.get(name);
+        List<IClass> res = (List<IClass>) this.memberTypeCache.get(name);
         if (res == null) {
 
             // Notice: A type may be added multiply to the result set because we are in its scope
             // multiply. E.g. the type is a member of a superclass AND a member of an enclosing type.
             Set<IClass> s = new HashSet<>();
             this.findMemberType(name, s);
-            res = s.isEmpty() ? IClass.ZERO_ICLASSES : (IClass[]) s.toArray(new IClass[s.size()]);
+            res = s.isEmpty() ? IClass.ZERO_ICLASSES : new ArrayList<>(s);
 
             this.memberTypeCache.put(name, res);
         }
 
         return res;
     }
-    private final Map<String /*name*/, IClass[]> memberTypeCache = new HashMap<>();
-    private static final IClass[]                ZERO_ICLASSES   = new IClass[0];
+    private final Map<String /*name*/, List<IClass>> memberTypeCache = new HashMap<>();
+    private static final List<IClass>                ZERO_ICLASSES   = Collections.emptyList();
     private void
     findMemberType(@Nullable String name, Collection<IClass> result) throws CompileException {
 
         // Search for a type with the given name in the current class.
-        IClass[] memberTypes = this.getDeclaredIClasses();
+        List<IClass> memberTypes = this.getDeclaredIClasses();
         if (name == null) {
-            result.addAll(Arrays.asList(memberTypes));
+            result.addAll(memberTypes);
         } else {
             String memberDescriptor = Descriptor.fromClassName(
                 Descriptor.toClassName(this.getDescriptor())
@@ -843,18 +653,8 @@ class IClass implements ITypeVariableOrIClass {
     /**
      * @return The annotations of this type (possibly the empty array)
      */
-    public final IAnnotation[]
-    getIAnnotations() throws CompileException {
-        if (this.iAnnotationsCache != null) return this.iAnnotationsCache;
-        return (this.iAnnotationsCache = this.getIAnnotations2());
-    }
-    @Nullable private IAnnotation[] iAnnotationsCache;
-
-    /**
-     * @throws CompileException
-     */
-    protected IAnnotation[]
-    getIAnnotations2() throws CompileException { return IClass.NO_ANNOTATIONS; }
+    public abstract IAnnotation[]
+    getIAnnotations() throws CompileException;
 
     /**
      * Array of zero {@link IAnnotation}s.
@@ -918,12 +718,12 @@ class IClass implements ITypeVariableOrIClass {
         /**
          * Returns the types of the parameters of this constructor or method. This method is fast.
          */
-        public final IClass[]
+        public final List<IClass>
         getParameterTypes() throws CompileException {
             if (this.parameterTypesCache != null) return this.parameterTypesCache;
             return (this.parameterTypesCache = this.getParameterTypes2());
         }
-        @Nullable private IClass[] parameterTypesCache;
+        @Nullable private List<IClass> parameterTypesCache;
 
         /**
          * Opposed to the {@link Constructor}, there is no magic "{@code this$0}" parameter.
@@ -935,7 +735,7 @@ class IClass implements ITypeVariableOrIClass {
          *   However, the "synthetic parameters" ("{@code val$}<var>locvar</var>") <em>are</em> included.
          * </p>
          */
-        public abstract IClass[]
+        public abstract List<IClass>
         getParameterTypes2() throws CompileException;
 
         /**
@@ -957,17 +757,17 @@ class IClass implements ITypeVariableOrIClass {
         /**
          * Returns the types thrown by this constructor or method. This method is fast.
          */
-        public final IClass[]
+        public final List<IClass>
         getThrownExceptions() throws CompileException {
             if (this.thrownExceptionsCache != null) return this.thrownExceptionsCache;
             return (this.thrownExceptionsCache = this.getThrownExceptions2());
         }
-        @Nullable private IClass[] thrownExceptionsCache;
+        @Nullable private List<IClass> thrownExceptionsCache;
 
         /**
          * @return The types thrown by this constructor or method
          */
-        public abstract IClass[]
+        public abstract List<IClass>
         getThrownExceptions2() throws CompileException;
 
         /**
@@ -989,18 +789,18 @@ class IClass implements ITypeVariableOrIClass {
             if (thatIsVarargs) {
 
                 // Both are varargs.
-                final IClass[] thisParameterTypes = this.getParameterTypes();
-                final IClass[] thatParameterTypes = that.getParameterTypes();
+                final List<IClass> thisParameterTypes = this.getParameterTypes();
+                final List<IClass> thatParameterTypes = that.getParameterTypes();
 
-                IClass[] t, u;
+                List<IClass> t, u;
                 int      n, k;
 
-                if (thisParameterTypes.length >= thatParameterTypes.length) {
+                if (thisParameterTypes.size() >= thatParameterTypes.size()) {
                     t = thisParameterTypes;
                     u = thatParameterTypes;
-                    n = t.length;
-                    k = u.length;
-                    IClass[] s = u;
+                    n = t.size();
+                    k = u.size();
+                    List<IClass> s = u;
                     // this = T | T_n
                     // that = U | U_k
                     // n >= k
@@ -1011,50 +811,50 @@ class IClass implements ITypeVariableOrIClass {
                     final int kMinus1 = k - 1;
                     for (int j = 0; j < kMinus1; ++j) {
                         // expect T[j] <: S[j]
-                        if (!s[j].isAssignableFrom(t[j])) {
+                        if (!s.get(j).isAssignableFrom(t.get(j))) {
                             return false;
                         }
                     }
 
-                    final IClass sk1 = s[kMinus1].getComponentType();
+                    final IClass sk1 = s.get(kMinus1).getComponentType();
                     assert sk1 != null;
 
                     final int nMinus1 = n - 1;
                     for (int j = kMinus1; j < nMinus1; ++j) {
                         // expect T[j] <: S[k -1]
-                        if (!sk1.isAssignableFrom(t[j])) {
+                        if (!sk1.isAssignableFrom(t.get(j))) {
                             return false;
                         }
                     }
-                    if (!sk1.isAssignableFrom(t[nMinus1])) {
+                    if (!sk1.isAssignableFrom(t.get(nMinus1))) {
                         return false;
                     }
                 } else {
                     u = thisParameterTypes;
                     t = thatParameterTypes;
-                    n = t.length;
-                    k = u.length;
-                    IClass[] s = t;
+                    n = t.size();
+                    k = u.size();
+                    List<IClass> s = t;
                     // n >= k
                     final int kMinus1 = k - 1;
                     for (int j = 0; j < kMinus1; ++j) {
                         // expect U[j] <: S[j]
-                        if (!s[j].isAssignableFrom(u[j])) {
+                        if (!s.get(j).isAssignableFrom(u.get(j))) {
                             return false;
                         }
                     }
 
-                    final IClass uk1 = u[kMinus1].getComponentType();
+                    final IClass uk1 = u.get(kMinus1).getComponentType();
                     assert uk1 != null;
 
                     final int nMinus1 = n - 1;
                     for (int j = kMinus1; j < nMinus1; ++j) {
                         // expect U[k -1] <: S[j]
-                        if (!s[j].isAssignableFrom(uk1)) {
+                        if (!s.get(j).isAssignableFrom(uk1)) {
                             return false;
                         }
                     }
-                    IClass snm1ct = s[nMinus1].getComponentType();
+                    IClass snm1ct = s.get(nMinus1).getComponentType();
                     assert snm1ct != null;
                     if (!snm1ct.isAssignableFrom(uk1)) {
                         return false;
@@ -1079,16 +879,16 @@ class IClass implements ITypeVariableOrIClass {
             //     }
             // }
 
-            IClass[] thisParameterTypes = this.getParameterTypes();
-            IClass[] thatParameterTypes = that.getParameterTypes();
-            for (int i = 0; i < thisParameterTypes.length; ++i) {
-                if (!thatParameterTypes[i].isAssignableFrom(thisParameterTypes[i])) {
+            List<IClass> thisParameterTypes = this.getParameterTypes();
+            List<IClass> thatParameterTypes = that.getParameterTypes();
+            for (int i = 0; i < thisParameterTypes.size(); ++i) {
+                if (!thatParameterTypes.get(i).isAssignableFrom(thisParameterTypes.get(i))) {
                     IClass.LOGGER.exiting(null, "isMoreSpecificThan", false);
                     return false;
                 }
             }
 
-            boolean result = !Arrays.equals(thisParameterTypes, thatParameterTypes);
+            boolean result = !thisParameterTypes.equals(thatParameterTypes);
             IClass.LOGGER.exiting(null, "isMoreSpecificThan", result);
             return result;
         }
@@ -1113,15 +913,15 @@ class IClass implements ITypeVariableOrIClass {
         @Override public MethodDescriptor
         getDescriptor2() throws CompileException {
 
-            IClass[] parameterTypes = this.getParameterTypes();
+            List<IClass> parameterTypes = this.getParameterTypes();
 
             // Iff this is an inner class, prepend the magic "this$0" constructor parameter.
             {
                 IClass outerIClass = IClass.this.getOuterIClass();
                 if (outerIClass != null) {
-                    IClass[] tmp = new IClass[parameterTypes.length + 1];
-                    tmp[0] = outerIClass;
-                    System.arraycopy(parameterTypes, 0, tmp, 1, parameterTypes.length);
+                    List<IClass> tmp = new ArrayList<>();
+                    tmp.add(outerIClass);
+                    System.arraycopy(parameterTypes, 0, tmp, 1, parameterTypes.size());
                     parameterTypes = tmp;
                 }
             }
@@ -1145,10 +945,10 @@ class IClass implements ITypeVariableOrIClass {
             StringBuilder sb = new StringBuilder(this.getDeclaringIClass().toString());
             sb.append('(');
             try {
-                IClass[] parameterTypes = this.getParameterTypes();
-                for (int i = 0; i < parameterTypes.length; ++i) {
+                List<IClass> parameterTypes = this.getParameterTypes();
+                for (int i = 0; i < parameterTypes.size(); ++i) {
                     if (i > 0) sb.append(", ");
-                    sb.append(parameterTypes[i].toString());
+                    sb.append(parameterTypes.get(i).toString());
                 }
             } catch (CompileException ex) {
                 sb.append("<invalid type>");
@@ -1209,20 +1009,20 @@ class IClass implements ITypeVariableOrIClass {
             sb.append(this.getName());
             sb.append('(');
             try {
-                IClass[] parameterTypes = this.getParameterTypes();
-                for (int i = 0; i < parameterTypes.length; ++i) {
+                List<IClass> parameterTypes = this.getParameterTypes();
+                for (int i = 0; i < parameterTypes.size(); ++i) {
                     if (i > 0) sb.append(", ");
-                    sb.append(parameterTypes[i].toString());
+                    sb.append(parameterTypes.get(i).toString());
                 }
             } catch (CompileException ex) {
                 sb.append("<invalid type>");
             }
             sb.append(')');
             try {
-                IClass[] tes = this.getThrownExceptions();
-                if (tes.length > 0) {
-                    sb.append(" throws ").append(tes[0]);
-                    for (int i = 1; i < tes.length; ++i) sb.append(", ").append(tes[i]);
+                List<IClass> tes = this.getThrownExceptions();
+                if (tes.size() > 0) {
+                    sb.append(" throws ").append(tes.get(0));
+                    for (int i = 1; i < tes.size(); ++i) sb.append(", ").append(tes.get(i));
                 }
             } catch (CompileException ex) {
                 sb.append("<invalid thrown exception type>");
@@ -1260,7 +1060,7 @@ class IClass implements ITypeVariableOrIClass {
          * @return The descriptor of this field
          */
         public String
-        getDescriptor() throws CompileException { return IClass.rawTypeOf(this.getType()).getDescriptor(); }
+        getDescriptor() throws CompileException { return this.getType().getDescriptor(); }
 
         /**
          * Returns the value of the field if it is a compile-time constant value, i.e. the field is FINAL and its
@@ -1281,7 +1081,7 @@ class IClass implements ITypeVariableOrIClass {
         /**
          * @return The type of the annotation
          */
-        IType getAnnotationType() throws CompileException;
+        IClass getAnnotationType() throws CompileException;
 
         /**
          * Returns the value of the <var>name</var>d element:
@@ -1325,33 +1125,18 @@ class IClass implements ITypeVariableOrIClass {
         Object getElementValue(String name) throws CompileException;
     }
 
-    /**
-     * This class caches the declared methods in order to minimize the invocations of {@link #getDeclaredIMethods2()}.
-     */
-    public void
-    invalidateMethodCaches() {
-        this.declaredIMethodsCache = null;
-        this.declaredIMethodCache  = null;
-    }
-
-    public static IClass
-    rawTypeOf(IType type) {
-        while (type instanceof IParameterizedType) type = ((IParameterizedType) type).getRawType();
-        assert type instanceof IClass;
-        return (IClass) type;
-    }
 
 //    /**
 //     * @param typeArguments Zero-length array if this {@link IClass} is not parameterized
 //     */
-//    public IType
-//    parameterize(final IType[] typeArguments) throws CompileException {
+//    public IClass
+//    parameterize(final IClass[] typeArguments) throws CompileException {
 //
-//        ITypeVariable[] iTypeVariables = this.getITypeVariables();
+//        ITypeVariable[] iClassVariables = this.getITypeVariables();
 //
-//        if (typeArguments.length == 0 && iTypeVariables.length == 0) return this;
+//        if (typeArguments.length == 0 && iClassVariables.length == 0) return this;
 //
-//        if (iTypeVariables.length == 0) {
+//        if (iClassVariables.length == 0) {
 //            throw new CompileException("Class \"" + this.toString() + "\" cannot be parameterized", null);
 //        }
 //
@@ -1360,33 +1145,33 @@ class IClass implements ITypeVariableOrIClass {
 //            return this;
 //        }
 //
-//        List<IType> key = Arrays.asList(typeArguments);
+//        List<IClass> key = Arrays.asList(typeArguments);
 //
-//        Map<List<IType> /*typeArguments*/, IParameterizedType> m = this.parameterizations;
-//        if (m == null) this.parameterizations = (m = new HashMap<List<IType>, IParameterizedType>());
+//        Map<List<IClass> /*typeArguments*/, IParameterizedType> m = this.parameterizations;
+//        if (m == null) this.parameterizations = (m = new HashMap<List<IClass>, IParameterizedType>());
 //
 //        {
-//            IType result = m.get(key);
+//            IClass result = m.get(key);
 //            if (result != null) return result;
 //        }
 //
-//        if (iTypeVariables.length != typeArguments.length) {
+//        if (iClassVariables.length != typeArguments.length) {
 //            throw new CompileException((
 //                "Number of type arguments ("
 //                + typeArguments.length
 //                + ") does not match number of type variables ("
-//                + iTypeVariables.length
+//                + iClassVariables.length
 //                + ") of class \""
 //                + this.toString()
 //                + "\""
 //            ), null);
 //        }
 //
-//        for (int i = 0; i < iTypeVariables.length; i++) {
-//            ITypeVariable tv = iTypeVariables[i];
-//            IType         ta = typeArguments[i];
+//        for (int i = 0; i < iClassVariables.length; i++) {
+//            ITypeVariable tv = iClassVariables[i];
+//            IClass         ta = typeArguments[i];
 //
-//            for (ITypeVariableOrIClass b : tv.getBounds()) {
+//            for (IClass b : tv.getBounds()) {
 //                assert b instanceof IClass;
 //
 //                if (ta instanceof IClass) {
@@ -1429,8 +1214,8 @@ class IClass implements ITypeVariableOrIClass {
 //
 //        IParameterizedType result = new IParameterizedType() {
 //
-//            @Override public IType[] getActualTypeArguments() { return typeArguments; }
-//            @Override public IType getRawType() { return IClass.this; }
+//            @Override public IClass[] getActualTypeArguments() { return typeArguments; }
+//            @Override public IClass getRawType() { return IClass.this; }
 //
 //            @Override public String
 //            toString() {
@@ -1442,5 +1227,5 @@ class IClass implements ITypeVariableOrIClass {
 //
 //        return result;
 //    }
-//    @Nullable Map<List<IType> /*typeArguments*/, IParameterizedType> parameterizations;
+//    @Nullable Map<List<IClass> /*typeArguments*/, IParameterizedType> parameterizations;
 }

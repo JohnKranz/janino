@@ -27,17 +27,102 @@ package org.codehaus.janino;
 
 import org.codehaus.commons.compiler.CompileException;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 /**
  * Type bounds can either be a class or interface type, or a type variable. Example: {@code MySet<K extends
  * Comparable & T>}
  */
 public
-interface ITypeVariable extends ITypeVariableOrIClass {
+class ITypeVariable extends IClass {
 
-    String getName();
+    protected String name;
+    protected IClass superClass;
+    protected List<IClass> interfaces = new ArrayList<>();
+    protected IClass declaringClass;
 
-    /**
-     * @return A zero-length array if this type variable has no bounds
-     */
-    ITypeVariableOrIClass[] getBounds() throws CompileException;
+    public ITypeVariable(String name,IClass declaringClass){
+        this.name = name;
+        this.declaringClass = declaringClass;
+    }
+    public ITypeVariable(String name,IClass declaringClass,List<IClass> bounds) throws CompileException{
+        this.name = name;
+        this.declaringClass = declaringClass;
+        for(IClass clz : bounds){
+            if(!clz.isInterface()){
+//                if(clz.isEnum())
+                if(this.superClass == null)
+                    this.superClass = clz;
+                else throw new CompileException("Type parameter bounds should only contains one class.",null);
+            }else{
+                interfaces.add(clz);
+            }
+        }
+    }
+
+    public String getName(){
+        return name;
+    }
+
+    @Override
+    public ITypeVariable[] getITypeVariables() throws CompileException {
+        return new ITypeVariable[0];
+    }
+
+    @Override
+    public IClass getSuperclass() throws CompileException {
+        return superClass;
+    }
+
+    @Override
+    public List<IClass> getInterfaces() throws CompileException {
+        return interfaces;
+    }
+
+    @Override
+    public Access getAccess() {
+        return Access.PRIVATE;
+    }
+
+    @Override
+    public IClass getDeclaringIClass() throws CompileException {
+        return declaringClass;
+    }
+
+    @Override
+    public boolean isAbstract() {
+        return false;
+    }
+
+    @Override
+    public String getDescriptor() {
+        return null;
+    }
+
+    @Override public boolean isFinal() {return false;}
+
+    @Override public boolean isInterface() {return superClass == null;}
+
+
+
+
+    @Override
+    public IClass getOuterIClass() throws CompileException {
+        return null;
+    }
+
+    @Override public List<IClass> getDeclaredIClasses() throws CompileException {return Collections.emptyList();}
+
+
+    @Override public List<IField> getDeclaredIFields() {return Collections.emptyList();}
+    @Override public List<IMethod> getDeclaredIMethods() {return NO_IMETHODS;}
+    @Override public List<IConstructor> getDeclaredIConstructors() {return Collections.emptyList();}
+    @Override public IAnnotation[] getIAnnotations() throws CompileException {return NO_ANNOTATIONS;}
+    @Override public boolean isEnum() {return false;}
+    @Override public boolean isArray() {return false;}
+    @Override public boolean isPrimitive() {return false;}
+    @Override public boolean isPrimitiveNumeric() {return false;}
+    @Override public IClass getComponentType() {return null;}
 }

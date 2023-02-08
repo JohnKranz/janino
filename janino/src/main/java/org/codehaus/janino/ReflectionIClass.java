@@ -35,7 +35,10 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 import org.codehaus.commons.compiler.CompileException;
 import org.codehaus.commons.compiler.InternalCompilerException;
@@ -45,7 +48,7 @@ import org.codehaus.commons.nullanalysis.Nullable;
 /**
  * Wraps a {@link java.lang.Class} in an {@link org.codehaus.janino.IClass}.
  */
-class ReflectionIClass extends IClass {
+class ReflectionIClass extends CachedIClass {
 
     private final Class<?>     clazz;
     private final IClassLoader iClassLoader;
@@ -73,27 +76,28 @@ class ReflectionIClass extends IClass {
     private ITypeVariable
     typeVariableToITypeVariable(final TypeVariable<?> tv) {
 
-        return new ITypeVariable() {
+        return null;
+        /*return new ITypeVariable() {
 
             @Override public String
             getName() { return tv.getName(); }
 
-            @Override public ITypeVariableOrIClass[]
+            @Override public IClass[]
             getBounds() throws CompileException {
-                IType[] tmp = ReflectionIClass.this.typesToITypes(tv.getBounds());
-                return (ITypeVariableOrIClass[]) Arrays.copyOf(tmp, tmp.length, ITypeVariableOrIClass[].class);
+                IClass[] tmp = ReflectionIClass.this.typesToITypes(tv.getBounds());
+                return (IClass[]) Arrays.copyOf(tmp, tmp.length, IClass[].class);
             }
-        };
+        };*/
     }
 
-    private IType[]
+    private IClass[]
     typesToITypes(Type[] types) throws CompileException {
-        IType[] result = new IType[types.length];
+        IClass[] result = new IClass[types.length];
         for (int i = 0; i < result.length; i++) result[i] = this.typeToIType(types[i]);
         return result;
     }
 
-    private IType
+    private IClass
     typeToIType(Type type) throws CompileException {
         if (type instanceof Class) {
             IClass iClass;
@@ -122,45 +126,45 @@ class ReflectionIClass extends IClass {
         }
     }
 
-    @Override protected IConstructor[]
+    @Override protected List<IConstructor>
     getDeclaredIConstructors2() {
         Constructor<?>[] constructors = this.clazz.getDeclaredConstructors();
-        IConstructor[]   result       = new IConstructor[constructors.length];
-        for (int i = 0; i < constructors.length; ++i) {
-            result[i] = new ReflectionIConstructor(constructors[i]);
+        List<IConstructor>   result       = new ArrayList<>();
+        for (Constructor<?> constructor : constructors) {
+            result.add(new ReflectionIConstructor(constructor));
         }
         return result;
     }
 
-    @Override protected IMethod[]
+    @Override protected List<IMethod>
     getDeclaredIMethods2() {
         Method[] methods  = this.clazz.getDeclaredMethods();
 
         if (methods.length == 0 && this.clazz.isArray()) {
 
             // Arrays have ONE single method: "Object clone()".
-            return new IMethod[] { new IMethod() {
+            return Collections.singletonList(new IMethod() {
                 @Override public IAnnotation[] getAnnotations()       { return new IAnnotation[0]; }
                 @Override public Access        getAccess()            { return Access.PUBLIC;      }
                 @Override public boolean       isStatic()             { return false;              }
                 @Override public boolean       isAbstract()           { return false;              }
                 @Override public String        getName()              { return "clone";            }
-                @Override public IClass[]      getParameterTypes2()   { return new IClass[0];      }
+                @Override public List<IClass>      getParameterTypes2()   { return Collections.emptyList();      }
                 @Override public boolean       isVarargs()            { return false;              }
-                @Override public IClass[]      getThrownExceptions2() { return new IClass[0];      }
+                @Override public List<IClass>      getThrownExceptions2() { return Collections.emptyList();      }
 
                 @Override public IClass
                 getReturnType() { return ReflectionIClass.this.iClassLoader.TYPE_java_lang_Object; }
-            } };
+            });
         }
 
         return this.methodsToIMethods(methods);
     }
 
-    @Override protected IField[]
+    @Override protected List<IField>
     getDeclaredIFields2() { return this.fieldsToIFields(this.clazz.getDeclaredFields()); }
 
-    @Override protected IClass[]
+    @Override protected List<IClass>
     getDeclaredIClasses2() { return this.classesToIClasses(this.clazz.getDeclaredClasses()); }
 
     @Override @Nullable protected IClass
@@ -191,7 +195,7 @@ class ReflectionIClass extends IClass {
         return componentType == null ? null : this.classToIClass(componentType);
     }
 
-    @Override protected IClass[] getInterfaces2() { return this.classesToIClasses(this.clazz.getInterfaces()); }
+    @Override protected List<IClass> getInterfaces2() { return this.classesToIClasses(this.clazz.getInterfaces()); }
     @Override protected String   getDescriptor2() { return Descriptor.fromClassName(this.clazz.getName());     }
 
     @Override public Access  getAccess()   { return ReflectionIClass.modifiers2Access(this.clazz.getModifiers()); }
@@ -338,33 +342,35 @@ class ReflectionIClass extends IClass {
         }
 
         // Implement "IConstructor".
-        @Override public IClass[]
+        @Override public List<IClass>
         getParameterTypes2() throws CompileException {
-            IClass[] parameterTypes = ReflectionIClass.this.classesToIClasses(this.constructor.getParameterTypes());
+            List<IClass> parameterTypes = ReflectionIClass.this.classesToIClasses(this.constructor.getParameterTypes());
 
             // The JAVADOC of java.lang.reflect.Constructor does not document it, but "getParameterTypes()" includes
             // the synthetic "enclosing instance" parameter.
             IClass outerClass = ReflectionIClass.this.getOuterIClass();
             if (outerClass != null) {
-                if (parameterTypes.length < 1) {
+                if (parameterTypes.size() < 1) {
                     throw new CompileException(
                         "Constructor \"" + this.constructor + "\" lacks synthetic enclosing instance parameter",
                         null
                     );
                 }
-                if (parameterTypes[0] != outerClass) {
+                if (parameterTypes.get(0) != outerClass) {
                     throw new CompileException((
                         "Enclosing instance parameter of constructor \""
                         + this.constructor
                         + "\" has wrong type -- \""
-                        + parameterTypes[0]
+                        + parameterTypes.get(0)
                         + "\" vs. \""
                         + outerClass
                         + "\""
                     ), null);
                 }
-                IClass[] tmp = new IClass[parameterTypes.length - 1];
-                System.arraycopy(parameterTypes, 1, tmp, 0, tmp.length);
+                List<IClass> tmp = new ArrayList<>();
+                for(int i=1;i<parameterTypes.size();i++){
+                    tmp.add(parameterTypes.get(i));
+                }
                 parameterTypes = tmp;
             }
 
@@ -381,7 +387,7 @@ class ReflectionIClass extends IClass {
             return new MethodDescriptor(Descriptor.VOID, parameterDescriptors);
         }
 
-        @Override public IClass[]
+        @Override public List<IClass>
         getThrownExceptions2() {
             return ReflectionIClass.this.classesToIClasses(this.constructor.getExceptionTypes());
         }
@@ -412,7 +418,7 @@ class ReflectionIClass extends IClass {
             return Modifier.isTransient(this.method.getModifiers());
         }
 
-        @Override public IClass[]
+        @Override public List<IClass>
         getParameterTypes2() { return ReflectionIClass.this.classesToIClasses(this.method.getParameterTypes()); }
 
         @Override public boolean
@@ -424,7 +430,7 @@ class ReflectionIClass extends IClass {
         @Override public IClass
         getReturnType() { return ReflectionIClass.this.classToIClass(this.method.getReturnType()); }
 
-        @Override public IClass[]
+        @Override public List<IClass>
         getThrownExceptions2() { return ReflectionIClass.this.classesToIClasses(this.method.getExceptionTypes()); }
 
         private final Method method;
@@ -520,29 +526,29 @@ class ReflectionIClass extends IClass {
     /**
      * @see #classToIClass(Class)
      */
-    private IClass[]
+    private List<IClass>
     classesToIClasses(Class<?>[] cs) {
 
-        IClass[] result = new IClass[cs.length];
-        for (int i = 0; i < cs.length; ++i) result[i] = this.classToIClass(cs[i]);
+        List<IClass> result = new ArrayList<>();
+        for (Class<?> clazz : cs) result.add(this.classToIClass(clazz));
 
         return result;
     }
 
-    private IMethod[]
+    private List<IMethod>
     methodsToIMethods(Method[] methods) {
 
-        IMethod[] result = new IMethod[methods.length];
-        for (int i = 0; i < result.length; i++) result[i] = new ReflectionIMethod(methods[i]);
+        List<IMethod> result = new ArrayList<>();
+        for (Method method : methods) result.add(new ReflectionIMethod(method));
 
         return result;
     }
 
-    private IField[]
+    private List<IField>
     fieldsToIFields(Field[] fields) {
 
-        IField[] result = new IField[fields.length];
-        for (int i = 0; i < fields.length; ++i) result[i] = new ReflectionIField(fields[i]);
+        List<IField> result = new ArrayList<>();
+        for (Field field : fields) result.add(new ReflectionIField(field));
 
         return result;
     }

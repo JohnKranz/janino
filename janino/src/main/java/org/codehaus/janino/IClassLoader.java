@@ -26,10 +26,7 @@
 package org.codehaus.janino;
 
 import java.io.File;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -213,7 +210,7 @@ class IClassLoader {
     getMethod(IClass declaringType, String name, IClass... parameterTypes) {
 
         try {
-            return declaringType.findIMethod(name, parameterTypes);
+            return declaringType.findIMethod(name, Arrays.asList(parameterTypes));
         } catch (CompileException ce) {
             throw new AssertionError(ce);
         }
@@ -240,7 +237,7 @@ class IClassLoader {
 
         IConstructor result;
         try {
-            result = declaringType.findIConstructor(parameterTypes);
+            result = declaringType.findIConstructor(Arrays.asList(parameterTypes));
         } catch (CompileException ce) {
             throw new AssertionError(ce);
         }
@@ -440,16 +437,16 @@ class IClassLoader {
     private IClass
     getArrayIClass2(final IClass componentType) {
 
-        return new IClass() {
+        return new CachedIClass() {
 
             @Override protected ITypeVariable[]    getITypeVariables2()        { return new ITypeVariable[0];       }
-            @Override public IClass.IConstructor[] getDeclaredIConstructors2() { return new IClass.IConstructor[0]; }
+            @Override public List<IClass.IConstructor> getDeclaredIConstructors2() { return Collections.emptyList(); }
 
             // Special trickery #17: Arrays override "Object.clone()", but without "throws
             // CloneNotSupportedException"!
-            @Override public IClass.IMethod[]
+            @Override public List<IClass.IMethod>
             getDeclaredIMethods2() {
-                return new IClass.IMethod[] {
+                return Collections.singletonList(
                     new IMethod() {
                         @Override public IAnnotation[] getAnnotations()       { return new IAnnotation[0];                      }
                         @Override public Access        getAccess()            { return Access.PUBLIC;                           }
@@ -457,19 +454,19 @@ class IClassLoader {
                         @Override public boolean       isAbstract()           { return false;                                   }
                         @Override public IClass        getReturnType()        { return IClassLoader.this.TYPE_java_lang_Object; }
                         @Override public String        getName()              { return "clone";                                 }
-                        @Override public IClass[]      getParameterTypes2()   { return new IClass[0];                           }
+                        @Override public List<IClass> getParameterTypes2()   { return Collections.emptyList();                           }
                         @Override public boolean       isVarargs()            { return false;                                   }
-                        @Override public IClass[]      getThrownExceptions2() { return new IClass[0];                           }
+                        @Override public List<IClass>      getThrownExceptions2() { return Collections.emptyList();                           }
                     }
-                };
+                );
             }
 
-            @Override public IClass.IField[]  getDeclaredIFields2()  { return new IClass.IField[0];                    }
-            @Override public IClass[]         getDeclaredIClasses2() { return new IClass[0];                           }
+            @Override public List<IClass.IField>  getDeclaredIFields2()  { return Collections.emptyList();                    }
+            @Override public List<IClass>         getDeclaredIClasses2() { return Collections.emptyList();                           }
             @Override @Nullable public IClass getDeclaringIClass2()  { return null;                                    }
             @Override @Nullable public IClass getOuterIClass2()      { return null;                                    }
             @Override public IClass           getSuperclass2()       { return IClassLoader.this.TYPE_java_lang_Object; }
-            @Override public IClass[]         getInterfaces2()       { return new IClass[0];                           }
+            @Override public List<IClass>         getInterfaces2()       { return Collections.emptyList();                           }
             @Override public String           getDescriptor2()       { return '[' + componentType.getDescriptor();     }
             @Override public Access           getAccess()            { return componentType.getAccess();               }
             @Override public boolean          isFinal()              { return true;                                    }

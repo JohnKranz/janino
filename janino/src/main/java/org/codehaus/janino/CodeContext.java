@@ -165,7 +165,7 @@ class CodeContext {
      *             LocalVariableTable
      */
     public Java.LocalVariableSlot
-    allocateLocalVariable(short size, @Nullable String name, @Nullable IType type) {
+    allocateLocalVariable(short size, @Nullable String name, @Nullable IClass type) {
 
         LocalScope currentScope = this.currentLocalScope;
         assert currentScope != null : "saveLocalVariables must be called first";
@@ -439,10 +439,10 @@ class CodeContext {
     }
 
     private static IClass
-    rawTypeOf(IType iType) {
-        while (iType instanceof IParameterizedType) iType = ((IParameterizedType) iType).getRawType();
-        assert iType instanceof IClass;
-        return (IClass) iType;
+    rawTypeOf(IClass iClass) {
+        while (iClass instanceof IParameterizedType) iClass = ((IParameterizedType) iClass).getRawType();
+        assert iClass instanceof IClass;
+        return (IClass) iClass;
     }
 
     /**
