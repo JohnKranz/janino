@@ -63,13 +63,7 @@ class ReflectionIClass extends CachedIClass {
 
     @Override public List<ITypeVariable>
     getITypeVariables2() throws CompileException {
-
-        final TypeVariable<?>[] tps = this.clazz.getTypeParameters();
-
-        List<ITypeVariable> result = new ArrayList<>();
-        for (TypeVariable<?> tp : tps) result.add(new ITypeVariable(tp.getName(),this));
-
-        return result;
+        return makeTypeVariables(this, Arrays.asList(clazz.getTypeParameters()));
     }
 
     @Override protected List<IConstructor>
@@ -328,11 +322,7 @@ class ReflectionIClass extends CachedIClass {
 
         @Override
         public List<ITypeVariable> getITypeVariables2() throws CompileException {
-            List<ITypeVariable> result = new ArrayList<>();
-            for (TypeVariable<?> tp : this.constructor.getTypeParameters())
-                result.add(new ITypeVariable(tp.getName(),this));
-
-            return result;
+            return makeTypeVariables(this, Arrays.asList(constructor.getTypeParameters()));
         }
 
         @Override public MethodDescriptor
@@ -381,11 +371,7 @@ class ReflectionIClass extends CachedIClass {
 
         @Override
         public List<ITypeVariable> getITypeVariables2() throws CompileException {
-            List<ITypeVariable> result = new ArrayList<>();
-            for (TypeVariable<?> tp : this.method.getTypeParameters())
-                result.add(new ITypeVariable(tp.getName(),this));
-
-            return result;
+            return makeTypeVariables(this, Arrays.asList(method.getTypeParameters()));
         }
 
         @Override public boolean
@@ -532,39 +518,44 @@ class ReflectionIClass extends CachedIClass {
 
 
 
-
-
-    private IClass typeTransfer(IGenericDeclaration igd, Type type) throws CompileException{
-        if (type instanceof Class) {
-            IClass iClass;
-            try {
-                iClass = iClassLoader.loadIClass(Descriptor.fromClassName(((Class<?>) type).getName()));
-            } catch (ClassNotFoundException cnfe) {
-                throw new CompileException("Loading \"" + type + "\"", null, cnfe);
+    private List<ITypeVariable> makeTypeVariables(IGenericDeclaration igd,List<TypeVariable<?>> tvs) throws CompileException {
+        ITypeVariable.ITypeVariableMap<Type> itvm = new ITypeVariable.ITypeVariableMap<Type>(igd) {
+            @Override
+            public IClass reclassifyBoundType(Type type) throws CompileException {
+                if (type instanceof Class) {
+                    IClass iClass;
+                    try {
+                        iClass = iClassLoader.loadIClass(Descriptor.fromClassName(((Class<?>) type).getName()));
+                    } catch (ClassNotFoundException cnfe) {
+                        throw new CompileException("Loading \"" + type + "\"", null, cnfe);
+                    }
+                    if (iClass == null) throw new CompileException("Could not load \"" + type + "\"", null);
+                    return iClass;
+                } else
+                if (type instanceof GenericArrayType) {
+                    GenericArrayType genericArrayType = (GenericArrayType) type;
+                    IClass resolved = reclassifyBoundType(genericArrayType.getGenericComponentType());
+                    return iClassLoader.getArrayIClass(resolved);
+                } else
+                if (type instanceof ParameterizedType) {
+                    throw new AssertionError("NYI");
+                } else
+                if (type instanceof TypeVariable) {
+                    TypeVariable<?> typeVariable = (TypeVariable<?>) type;
+                    ITypeVariable itv = this.resolveGeneric(typeVariable.getName());
+                    if(itv == null) throw new CompileException("Impossible error.",null);
+                    return itv;
+                } else
+                if (type instanceof WildcardType) {
+                    throw new AssertionError("NYI");
+                } else
+                {
+                    throw new AssertionError(type.getClass());
+                }
             }
-            if (iClass == null) throw new CompileException("Could not load \"" + type + "\"", null);
-            return iClass;
-        } else
-        if (type instanceof GenericArrayType) {
-            GenericArrayType genericArrayType = (GenericArrayType) type;
-            IClass resolved = typeTransfer(igd,genericArrayType.getGenericComponentType());
-            return iClassLoader.getArrayIClass(resolved);
-        } else
-        if (type instanceof ParameterizedType) {
-            throw new AssertionError("NYI");
-        } else
-        if (type instanceof TypeVariable) {
-            TypeVariable<?> typeVariable = (TypeVariable<?>) type;
-            ITypeVariable itv = igd.resolveGeneric(typeVariable.getName());
-            if(itv == null) itv = new ITypeVariable(typeVariable.getName(),igd);
-            return itv;
-        } else
-        if (type instanceof WildcardType) {
-            throw new AssertionError("NYI");
-        } else
-        {
-            throw new AssertionError(type.getClass());
-        }
+        };
+        for(TypeVariable<?> tv : tvs) itvm.addITypeVariable(tv.getName(), Arrays.asList(tv.getBounds()));
+        return itvm.apply(iClassLoader);
     }
 
 }

@@ -26,10 +26,9 @@
 package org.codehaus.janino;
 
 import org.codehaus.commons.compiler.CompileException;
+import org.codehaus.commons.compiler.InternalCompilerException;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 /**
  * Type bounds can either be a class or interface type, or a type variable. Example: {@code MySet<K extends
@@ -44,15 +43,9 @@ class ITypeVariable extends IClass {
     protected IGenericDeclaration iGenericDeclaration;
     protected IClass declaringIClass;
 
-    public ITypeVariable(String name, IGenericDeclaration iGenericDeclaration) throws CompileException {
+    public ITypeVariable(String name, IGenericDeclaration iGenericDeclaration){
         this.name = name;
         this.iGenericDeclaration = iGenericDeclaration;
-        if(iGenericDeclaration instanceof IClass)
-            declaringIClass = (IClass) iGenericDeclaration;
-        else declaringIClass = iGenericDeclaration.getDeclaringIClass();
-    }
-
-    public void loadBounds(IClassLoader iClassLoader,List<IClass> bounds){
     }
 
     @Override
@@ -69,6 +62,56 @@ class ITypeVariable extends IClass {
     public String getName(){
         return name;
     }
+
+    protected void setBounds(IClassLoader iClassLoader,List<IClass> bounds) throws CompileException{
+        for(IClass clz : bounds){
+            if(superClass == null){
+                if(clz.isInterface())
+                    superClass = iClassLoader.TYPE_java_lang_Object;
+                else superClass = clz;
+            }else if(clz.isInterface()){
+                interfaces.add(clz);
+            }else throw new CompileException("Bound type should be interface here.",null);
+        }
+    }
+
+    public static abstract class ITypeVariableMap<T>{
+        protected Map<String,ITypeVariable> iTypeVariableMap = new HashMap<>();
+        protected Map<String,List<T>> iBoundDataMap = new HashMap<>();
+        protected IGenericDeclaration igd;
+        public ITypeVariableMap(IGenericDeclaration igd){
+            this.igd = igd;
+        }
+
+        public void addITypeVariable(String name,List<T> boundsData){
+            if(iTypeVariableMap.containsKey(name)) throw new InternalCompilerException("Duplicated type parameter "+name);
+            iTypeVariableMap.put(name,new ITypeVariable(name,igd));
+            iBoundDataMap.put(name,boundsData);
+        }
+
+        public ITypeVariable resolveGeneric(String name) throws CompileException {
+            ITypeVariable itv = iTypeVariableMap.get(name);
+            if(itv== null) itv = igd.getDeclaringIClass().resolveGeneric(name);
+            return itv;
+        }
+
+        public abstract IClass reclassifyBoundType(T typeData) throws CompileException ;
+
+        public List<ITypeVariable> apply(IClassLoader iClassLoader) throws CompileException {
+            for(String name : iBoundDataMap.keySet()){
+                List<IClass> bounds = new ArrayList<>();
+                for(T data : iBoundDataMap.get(name)){
+                    bounds.add(reclassifyBoundType(data));
+                }
+                iTypeVariableMap.get(name).setBounds(iClassLoader,bounds);
+            }
+            return new ArrayList<>(iTypeVariableMap.values());
+        }
+    }
+
+
+
+
 
     @Override
     public List<ITypeVariable> getITypeVariables() throws CompileException {
@@ -103,6 +146,11 @@ class ITypeVariable extends IClass {
     @Override public boolean isFinal() {return false;}
 
     @Override public boolean isInterface() {return false;}
+
+
+
+
+
 
 
 

@@ -174,7 +174,7 @@ class ClassFileIClass extends CachedIClass {
                 @Override public IClass
                 visitTypeVariableSignature(final TypeVariableSignature tvs) {
                     try {
-                        return new ITypeVariable(tvs.identifier,ClassFileIClass.this);
+                        return resolveGeneric(tvs.identifier);
                     } catch (CompileException e) {
                         throw new InternalCompilerException(e.getMessage());
                     }
