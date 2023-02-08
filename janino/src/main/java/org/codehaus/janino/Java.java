@@ -1088,7 +1088,7 @@ class Java {
         /**
          * Holds the resolved type during compilation.
          */
-        @Nullable IClass resolvedType;
+        @Nullable CachedIClass resolvedType;
 
         public
         AbstractTypeDeclaration(

@@ -441,8 +441,7 @@ class CodeContext {
     private static IClass
     rawTypeOf(IClass iClass) {
         while (iClass instanceof IParameterizedType) iClass = ((IParameterizedType) iClass).getRawType();
-        assert iClass instanceof IClass;
-        return (IClass) iClass;
+        return iClass;
     }
 
     /**

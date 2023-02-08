@@ -115,24 +115,24 @@ class ClassFileIClass extends CachedIClass {
 
     // Implement IClass.
 
-    @Override protected ITypeVariable[]
+    @Override protected List<ITypeVariable>
     getITypeVariables2() throws CompileException {
 
         ClassSignature cs = this.classSignature;
-        if (cs == null) return new ITypeVariable[0];
+        if (cs == null) return Collections.emptyList();
 
-        ITypeVariable[] result = new ITypeVariable[cs.formalTypeParameters.size()];
-        for (int i = 0; i < result.length; i++) {
+        List<ITypeVariable> result = new ArrayList<>();
+        for (int i = 0; i < cs.formalTypeParameters.size(); i++) {
             final FormalTypeParameter     ftp    = (FormalTypeParameter) cs.formalTypeParameters.get(i);
             final List<IClass> bounds = ClassFileIClass.this.getBounds(ftp);
-            result[i] = new ITypeVariable(ftp.identifier,this,bounds) {
+            result.add(new ITypeVariable(ftp.identifier,this) {
                 @Override public String
                 toString() {
                     String                  s  = name + " extends " + bounds.get(0);
                     for (int i = 1; i < bounds.size(); i++) s += " & " + bounds.get(i);
                     return s;
                 }
-            };
+            });
         }
 
         return result;
@@ -173,7 +173,11 @@ class ClassFileIClass extends CachedIClass {
 
                 @Override public IClass
                 visitTypeVariableSignature(final TypeVariableSignature tvs) {
-                    return new ITypeVariable(tvs.identifier,ClassFileIClass.this);
+                    try {
+                        return new ITypeVariable(tvs.identifier,ClassFileIClass.this);
+                    } catch (CompileException e) {
+                        throw new InternalCompilerException(e.getMessage());
+                    }
                 }
             }
         );
@@ -615,6 +619,11 @@ class ClassFileIClass extends CachedIClass {
                     return parameterTypes;
                 }
 
+                @Override
+                public List<ITypeVariable> getITypeVariables2() throws CompileException {
+                    return null;
+                }
+
                 @Override public List<IClass>      getThrownExceptions2() { return thrownExceptions; }
                 @Override public Access        getAccess()            { return access;           }
                 @Override public IAnnotation[] getAnnotations()       { return iAnnotations;     }
@@ -629,6 +638,12 @@ class ClassFileIClass extends CachedIClass {
                 @Override public IClass        getReturnType()        { return returnType;                                  }
                 @Override public String        getName()              { return name;                                        }
                 @Override public List<IClass>      getParameterTypes2()   { return parameterTypes;                              }
+
+                @Override
+                public List<ITypeVariable> getITypeVariables2() throws CompileException {
+                    return null;
+                }
+
                 @Override public boolean       isVarargs()            { return Mod.isVarargs(methodInfo.getAccessFlags());  }
                 @Override public List<IClass>      getThrownExceptions2() { return thrownExceptions;                            }
             };

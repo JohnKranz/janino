@@ -25,9 +25,23 @@
 
 package org.codehaus.janino;
 
-public
-abstract class IParameterizedType extends IClass {
+import java.util.Map;
 
-    abstract IClass[] getActualTypeArguments();
-    abstract IClass   getRawType();
+public
+class IParameterizedType extends WrappedIClass {
+
+    protected Map<ITypeVariable,IClass> typeArgumentsMap;
+
+    public IParameterizedType(){
+
+    }
+
+    public IClass getRawType(){
+        return wrappedClass;
+    }
+
+    @Override
+    public IClass getParameterizedType(ITypeVariable itv) {
+        return typeArgumentsMap.get(itv);
+    }
 }

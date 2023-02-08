@@ -11,17 +11,18 @@ public abstract class CachedIClass extends IClass{
     /**
      * @return Zero-length array if this {@link IClass} declares no type variables
      */
-    public final ITypeVariable[]
+    @Override
+    public final List<ITypeVariable>
     getITypeVariables() throws CompileException {
         if (this.iClassVariablesCache != null) return this.iClassVariablesCache;
         return (this.iClassVariablesCache = this.getITypeVariables2());
     }
-    @Nullable private ITypeVariable[] iClassVariablesCache;
+    @Nullable private List<ITypeVariable> iClassVariablesCache;
 
     /**
      * The uncached version of {@link #getDeclaredIConstructors()} which must be implemented by derived classes.
      */
-    protected abstract ITypeVariable[] getITypeVariables2() throws CompileException;
+    protected abstract List<ITypeVariable> getITypeVariables2() throws CompileException;
 
     /**
      * Returns all the constructors declared by the class represented by the type. If the class has a default

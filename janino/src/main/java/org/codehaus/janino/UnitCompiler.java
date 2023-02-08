@@ -6702,8 +6702,7 @@ class UnitCompiler {
     private static IClass
     rawTypeOf(IClass iClass) {
         while (iClass instanceof IParameterizedType) iClass = ((IParameterizedType) iClass).getRawType();
-        assert iClass instanceof IClass;
-        return (IClass) iClass;
+        return iClass;
     }
 
     private static List<IClass>
@@ -9498,6 +9497,9 @@ class UnitCompiler {
             @Override public IClass        getReturnType()        { return IClass.INT;         }
             @Override public String        getName()              { return name;               }
             @Override public List<IClass>      getParameterTypes2()   { return pts;                }
+
+            @Override public List<ITypeVariable> getITypeVariables2() throws CompileException {return Collections.emptyList();}
+
             @Override public boolean       isVarargs()            { return false;              }
             @Override public List<IClass>      getThrownExceptions2() { return Collections.emptyList();      }
         };
@@ -9623,6 +9625,9 @@ class UnitCompiler {
             return iInvocables.get(0).getDeclaringIClass().new IConstructor() {
                 @Override public boolean       isVarargs()            { return false;              }
                 @Override public List<IClass>      getParameterTypes2()   { return argumentTypes;      }
+
+                @Override public List<ITypeVariable> getITypeVariables2() throws CompileException { return Collections.emptyList();}
+
                 @Override public Access        getAccess()            { return Access.PUBLIC;      }
                 @Override public List<IClass>      getThrownExceptions2() { return Collections.emptyList();      }
                 @Override public IAnnotation[] getAnnotations()       { return new IAnnotation[0]; }
@@ -9639,6 +9644,9 @@ class UnitCompiler {
                 @Override public IClass        getReturnType()        { return IClass.INT;         }
                 @Override public String        getName()              { return methodName;         }
                 @Override public List<IClass>      getParameterTypes2()   { return argumentTypes;      }
+
+                @Override public List<ITypeVariable> getITypeVariables2() throws CompileException {return Collections.emptyList();}
+
                 @Override public boolean       isVarargs()            { return false;              }
                 @Override public List<IClass>      getThrownExceptions2() { return Collections.emptyList();      }
             };
@@ -9928,6 +9936,9 @@ class UnitCompiler {
                 @Override public IClass        getReturnType()      throws CompileException { return im.getReturnType();     }
                 @Override public String        getName()                                    { return im.getName();           }
                 @Override public List<IClass>      getParameterTypes2() throws CompileException { return im.getParameterTypes(); }
+
+                @Override public List<ITypeVariable> getITypeVariables2() throws CompileException {return im.getITypeVariables();}
+
                 @Override public boolean       isVarargs()                                  { return im.isVarargs();         }
                 @Override public List<IClass>      getThrownExceptions2()                       { return tes;                    }
             };
@@ -10134,7 +10145,7 @@ class UnitCompiler {
         return lv.type == IClass.INT ? lv : null;
     }
 
-    private IClass
+    private CachedIClass
     resolve(final TypeDeclaration td) {
 
         final AbstractTypeDeclaration atd = (AbstractTypeDeclaration) td;
@@ -10143,26 +10154,26 @@ class UnitCompiler {
 
         return (atd.resolvedType = new CachedIClass() {
 
-            @Override protected ITypeVariable[]
+            @Override protected List<ITypeVariable>
             getITypeVariables2() throws CompileException {
 
-                if (!(atd instanceof NamedTypeDeclaration)) return new ITypeVariable[0];
+                if (!(atd instanceof NamedTypeDeclaration)) return Collections.emptyList();
                 NamedTypeDeclaration ntd = (NamedTypeDeclaration) atd;
 
                 final Java.TypeParameter[] typeParameters = ntd.getOptionalTypeParameters();
-                if (typeParameters == null) return new ITypeVariable[0];
-                ITypeVariable[] result = new ITypeVariable[typeParameters.length];
-                for (int i = 0; i < result.length; i++) {
+                if (typeParameters == null) return Collections.emptyList();
+                List<ITypeVariable> result = new ArrayList<>();
+                for (int i = 0; i < typeParameters.length; i++) {
                     final TypeParameter tp = typeParameters[i];
 
-                    List<IClass> bounds = new ArrayList<>();
+                    /*List<IClass> bounds = new ArrayList<>();
                     if(tp.bound != null){
                         for (ReferenceType r : tp.bound) {
                             bounds.add(UnitCompiler.this.getType(r));
                         }
-                    }
+                    }*/
 
-                    result[i] = new ITypeVariable(tp.name,this,bounds);
+                    result.add(new ITypeVariable(tp.name,this));
                 }
                 return result;
             }
@@ -10184,6 +10195,9 @@ class UnitCompiler {
                         @Override public boolean       isAbstract()           { return false;              }
                         @Override public String        getName()              { return "values";           }
                         @Override public List<IClass>      getParameterTypes2()   { return Collections.emptyList();      }
+
+                        @Override public List<ITypeVariable> getITypeVariables2() throws CompileException {return Collections.emptyList();}
+
                         @Override public boolean       isVarargs()            { return false;              }
                         @Override public List<IClass>      getThrownExceptions2() { return Collections.emptyList();      }
 
@@ -10203,6 +10217,9 @@ class UnitCompiler {
                         @Override public boolean       isAbstract()           { return false;                                                                 }
                         @Override public String        getName()              { return "valueOf";                                                             }
                         @Override public List<IClass>      getParameterTypes2()   { return Collections.singletonList(UnitCompiler.this.iClassLoader.TYPE_java_lang_String); }
+
+                        @Override public List<ITypeVariable> getITypeVariables2() throws CompileException {return Collections.emptyList();}
+
                         @Override public boolean       isVarargs()            { return false;                                                                 }
                         @Override public List<IClass>      getThrownExceptions2() { return Collections.emptyList();                                                         }
 
@@ -10622,6 +10639,11 @@ class UnitCompiler {
 
         constructorDeclarator.iConstructor = this.resolve(constructorDeclarator.getDeclaringType()).new IConstructor() {
 
+            @Override
+            public List<ITypeVariable> getITypeVariables2() throws CompileException {
+                return null;
+            }
+
             @Nullable private IAnnotation[] ias;
 
             // Implement IMember.
@@ -10775,6 +10797,11 @@ class UnitCompiler {
                     res.add(parameterType);
                 }
                 return res;
+            }
+
+            @Override
+            public List<ITypeVariable> getITypeVariables2() throws CompileException {
+                return null;
             }
 
             @Override public List<IClass>

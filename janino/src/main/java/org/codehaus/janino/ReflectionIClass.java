@@ -58,72 +58,18 @@ class ReflectionIClass extends CachedIClass {
      */
     ReflectionIClass(Class<?> clazz, IClassLoader iClassLoader) {
         this.clazz        = clazz;
-        clazz.getTypeParameters();
         this.iClassLoader = iClassLoader;
     }
 
-    @Override public ITypeVariable[]
-    getITypeVariables2() {
+    @Override public List<ITypeVariable>
+    getITypeVariables2() throws CompileException {
 
         final TypeVariable<?>[] tps = this.clazz.getTypeParameters();
 
-        ITypeVariable[] result = new ITypeVariable[tps.length];
-        for (int i = 0; i < result.length; i++) result[i] = this.typeVariableToITypeVariable(tps[i]);
+        List<ITypeVariable> result = new ArrayList<>();
+        for (TypeVariable<?> tp : tps) result.add(new ITypeVariable(tp.getName(),this));
 
         return result;
-    }
-
-    private ITypeVariable
-    typeVariableToITypeVariable(final TypeVariable<?> tv) {
-
-        return null;
-        /*return new ITypeVariable() {
-
-            @Override public String
-            getName() { return tv.getName(); }
-
-            @Override public IClass[]
-            getBounds() throws CompileException {
-                IClass[] tmp = ReflectionIClass.this.typesToITypes(tv.getBounds());
-                return (IClass[]) Arrays.copyOf(tmp, tmp.length, IClass[].class);
-            }
-        };*/
-    }
-
-    private IClass[]
-    typesToITypes(Type[] types) throws CompileException {
-        IClass[] result = new IClass[types.length];
-        for (int i = 0; i < result.length; i++) result[i] = this.typeToIType(types[i]);
-        return result;
-    }
-
-    private IClass
-    typeToIType(Type type) throws CompileException {
-        if (type instanceof Class) {
-            IClass iClass;
-            try {
-                iClass = this.iClassLoader.loadIClass(Descriptor.fromClassName(((Class<?>) type).getName()));
-            } catch (ClassNotFoundException cnfe) {
-                throw new CompileException("Loading \"" + type + "\"", null, cnfe);
-            }
-            if (iClass == null) throw new CompileException("Could not load \"" + type + "\"", null);
-            return iClass;
-        } else
-        if (type instanceof GenericArrayType) {
-            throw new AssertionError("NYI");
-        } else
-        if (type instanceof ParameterizedType) {
-            throw new AssertionError("NYI");
-        } else
-        if (type instanceof TypeVariable) {
-            throw new AssertionError("NYI");
-        } else
-        if (type instanceof WildcardType) {
-            throw new AssertionError("NYI");
-        } else
-        {
-            throw new AssertionError(type.getClass());
-        }
     }
 
     @Override protected List<IConstructor>
@@ -150,6 +96,9 @@ class ReflectionIClass extends CachedIClass {
                 @Override public boolean       isAbstract()           { return false;              }
                 @Override public String        getName()              { return "clone";            }
                 @Override public List<IClass>      getParameterTypes2()   { return Collections.emptyList();      }
+
+                @Override public List<ITypeVariable> getITypeVariables2() throws CompileException {return Collections.emptyList();}
+
                 @Override public boolean       isVarargs()            { return false;              }
                 @Override public List<IClass>      getThrownExceptions2() { return Collections.emptyList();      }
 
@@ -377,6 +326,15 @@ class ReflectionIClass extends CachedIClass {
             return parameterTypes;
         }
 
+        @Override
+        public List<ITypeVariable> getITypeVariables2() throws CompileException {
+            List<ITypeVariable> result = new ArrayList<>();
+            for (TypeVariable<?> tp : this.constructor.getTypeParameters())
+                result.add(new ITypeVariable(tp.getName(),this));
+
+            return result;
+        }
+
         @Override public MethodDescriptor
         getDescriptor2() {
             Class<?>[] parameterTypes       = this.constructor.getParameterTypes();
@@ -420,6 +378,15 @@ class ReflectionIClass extends CachedIClass {
 
         @Override public List<IClass>
         getParameterTypes2() { return ReflectionIClass.this.classesToIClasses(this.method.getParameterTypes()); }
+
+        @Override
+        public List<ITypeVariable> getITypeVariables2() throws CompileException {
+            List<ITypeVariable> result = new ArrayList<>();
+            for (TypeVariable<?> tp : this.method.getTypeParameters())
+                result.add(new ITypeVariable(tp.getName(),this));
+
+            return result;
+        }
 
         @Override public boolean
         isStatic() { return Modifier.isStatic(this.method.getModifiers()); }
@@ -562,4 +529,42 @@ class ReflectionIClass extends CachedIClass {
             Access.DEFAULT
         );
     }
+
+
+
+
+
+    private IClass typeTransfer(IGenericDeclaration igd, Type type) throws CompileException{
+        if (type instanceof Class) {
+            IClass iClass;
+            try {
+                iClass = iClassLoader.loadIClass(Descriptor.fromClassName(((Class<?>) type).getName()));
+            } catch (ClassNotFoundException cnfe) {
+                throw new CompileException("Loading \"" + type + "\"", null, cnfe);
+            }
+            if (iClass == null) throw new CompileException("Could not load \"" + type + "\"", null);
+            return iClass;
+        } else
+        if (type instanceof GenericArrayType) {
+            GenericArrayType genericArrayType = (GenericArrayType) type;
+            IClass resolved = typeTransfer(igd,genericArrayType.getGenericComponentType());
+            return iClassLoader.getArrayIClass(resolved);
+        } else
+        if (type instanceof ParameterizedType) {
+            throw new AssertionError("NYI");
+        } else
+        if (type instanceof TypeVariable) {
+            TypeVariable<?> typeVariable = (TypeVariable<?>) type;
+            ITypeVariable itv = igd.resolveGeneric(typeVariable.getName());
+            if(itv == null) itv = new ITypeVariable(typeVariable.getName(),igd);
+            return itv;
+        } else
+        if (type instanceof WildcardType) {
+            throw new AssertionError("NYI");
+        } else
+        {
+            throw new AssertionError(type.getClass());
+        }
+    }
+
 }

@@ -29,10 +29,8 @@ import java.io.Serializable;
 import java.lang.reflect.Constructor;
 import java.util.*;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 
 import org.codehaus.commons.compiler.CompileException;
-import org.codehaus.commons.compiler.InternalCompilerException;
 import org.codehaus.commons.nullanalysis.Nullable;
 
 /**
@@ -43,7 +41,7 @@ import org.codehaus.commons.nullanalysis.Nullable;
  * </p>
  */
 public abstract
-class IClass {
+class IClass implements IGenericDeclaration {
 
     private static final Logger LOGGER = Logger.getLogger(IClass.class.getName());
 
@@ -59,7 +57,7 @@ class IClass {
      * The {@link IClass} of the {@code null} literal.
      */
     public static final IClass NULL = new IClass() {
-        @Override public ITypeVariable[]  getITypeVariables()        { return new ITypeVariable[0]; }
+        @Override public List<ITypeVariable>  getITypeVariables()        { return Collections.emptyList(); }
         @Override @Nullable public IClass getComponentType()         { return null;                 }
         @Override public IAnnotation[] getIAnnotations() throws CompileException {return IClass.NO_ANNOTATIONS;}
         @Override public List<IClass>         getDeclaredIClasses()      { return Collections.emptyList();        }
@@ -133,7 +131,7 @@ class IClass {
 
         PrimitiveIClass(String fieldDescriptor) { this.fieldDescriptor = fieldDescriptor; }
 
-        @Override public ITypeVariable[]  getITypeVariables()        { return new ITypeVariable[0]; }
+        @Override public List<ITypeVariable>  getITypeVariables()        { return Collections.emptyList(); }
         @Override @Nullable public IClass getComponentType()         { return null;                 }
 
         @Override public IAnnotation[] getIAnnotations() throws CompileException {return IClass.NO_ANNOTATIONS;}
@@ -162,9 +160,10 @@ class IClass {
     /**
      * @return Zero-length array if this {@link IClass} declares no type variables
      */
-    public abstract ITypeVariable[]
+    @Override public abstract List<ITypeVariable>
     getITypeVariables() throws CompileException;
 
+    @Override
     public ITypeVariable resolveGeneric(String name) throws CompileException {
         for(ITypeVariable itv : getITypeVariables()){
             if(itv.getName().equals(name))
@@ -174,7 +173,6 @@ class IClass {
             throw new CompileException("Generic type " + name + "not found.",null);
         return getDeclaringIClass().resolveGeneric(name);
     }
-
 
     public IClass getParameterizedType(ITypeVariable itv){return itv;}
 
@@ -689,7 +687,7 @@ class IClass {
      * Base class for {@link IConstructor} and {@link IMethod}.
      */
     public abstract
-    class IInvocable implements IMember {
+    class IInvocable implements IMember, IGenericDeclaration {
 
         private boolean argsNeedAdjust;
 
@@ -737,6 +735,29 @@ class IClass {
          */
         public abstract List<IClass>
         getParameterTypes2() throws CompileException;
+
+
+        private List<ITypeVariable> iTypeVariablesCache;
+        @Override public final
+        List<ITypeVariable> getITypeVariables() throws CompileException {
+            if(iTypeVariablesCache != null) return iTypeVariablesCache;
+            return (iTypeVariablesCache = getITypeVariables2());
+        }
+
+        /**
+         * @return Zero-length array if this {@link IClass} declares no type variables
+         */
+        public abstract
+        List<ITypeVariable> getITypeVariables2() throws CompileException;
+
+        @Override
+        public ITypeVariable resolveGeneric(String name) throws CompileException {
+            for(ITypeVariable itv : getITypeVariables()){
+                if(itv.getName().equals(name))
+                    return itv;
+            }
+            return getDeclaringIClass().resolveGeneric(name);
+        }
 
         /**
          * Returns the method descriptor of this constructor or method. This method is fast.

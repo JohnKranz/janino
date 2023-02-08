@@ -17,7 +17,7 @@ public class WrappedIClass extends IClass{
     }
 
     @Override
-    public ITypeVariable[] getITypeVariables() throws CompileException {
+    public List<ITypeVariable> getITypeVariables() throws CompileException {
         return wrappedClass.getITypeVariables();
     }
 

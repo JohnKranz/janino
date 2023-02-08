@@ -41,25 +41,29 @@ class ITypeVariable extends IClass {
     protected String name;
     protected IClass superClass;
     protected List<IClass> interfaces = new ArrayList<>();
-    protected IClass declaringClass;
+    protected IGenericDeclaration iGenericDeclaration;
+    protected IClass declaringIClass;
 
-    public ITypeVariable(String name,IClass declaringClass){
+    public ITypeVariable(String name, IGenericDeclaration iGenericDeclaration) throws CompileException {
         this.name = name;
-        this.declaringClass = declaringClass;
+        this.iGenericDeclaration = iGenericDeclaration;
+        if(iGenericDeclaration instanceof IClass)
+            declaringIClass = (IClass) iGenericDeclaration;
+        else declaringIClass = iGenericDeclaration.getDeclaringIClass();
     }
-    public ITypeVariable(String name,IClass declaringClass,List<IClass> bounds) throws CompileException{
-        this.name = name;
-        this.declaringClass = declaringClass;
-        for(IClass clz : bounds){
-            if(!clz.isInterface()){
-//                if(clz.isEnum())
-                if(this.superClass == null)
-                    this.superClass = clz;
-                else throw new CompileException("Type parameter bounds should only contains one class.",null);
-            }else{
-                interfaces.add(clz);
-            }
-        }
+
+    public void loadBounds(IClassLoader iClassLoader,List<IClass> bounds){
+    }
+
+    @Override
+    public IClass getDeclaringIClass() throws CompileException {
+        if(iGenericDeclaration instanceof IClass)
+            return (IClass) iGenericDeclaration;
+        return iGenericDeclaration.getDeclaringIClass();
+    }
+
+    public IGenericDeclaration getIGenericDeclaration() {
+        return iGenericDeclaration;
     }
 
     public String getName(){
@@ -67,8 +71,8 @@ class ITypeVariable extends IClass {
     }
 
     @Override
-    public ITypeVariable[] getITypeVariables() throws CompileException {
-        return new ITypeVariable[0];
+    public List<ITypeVariable> getITypeVariables() throws CompileException {
+        return Collections.emptyList();
     }
 
     @Override
@@ -87,11 +91,6 @@ class ITypeVariable extends IClass {
     }
 
     @Override
-    public IClass getDeclaringIClass() throws CompileException {
-        return declaringClass;
-    }
-
-    @Override
     public boolean isAbstract() {
         return false;
     }
@@ -103,7 +102,7 @@ class ITypeVariable extends IClass {
 
     @Override public boolean isFinal() {return false;}
 
-    @Override public boolean isInterface() {return superClass == null;}
+    @Override public boolean isInterface() {return false;}
 
 
 

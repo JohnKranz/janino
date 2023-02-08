@@ -439,7 +439,7 @@ class IClassLoader {
 
         return new CachedIClass() {
 
-            @Override protected ITypeVariable[]    getITypeVariables2()        { return new ITypeVariable[0];       }
+            @Override protected List<ITypeVariable>    getITypeVariables2()        { return Collections.emptyList();       }
             @Override public List<IClass.IConstructor> getDeclaredIConstructors2() { return Collections.emptyList(); }
 
             // Special trickery #17: Arrays override "Object.clone()", but without "throws
@@ -455,6 +455,9 @@ class IClassLoader {
                         @Override public IClass        getReturnType()        { return IClassLoader.this.TYPE_java_lang_Object; }
                         @Override public String        getName()              { return "clone";                                 }
                         @Override public List<IClass> getParameterTypes2()   { return Collections.emptyList();                           }
+
+                        @Override public List<ITypeVariable> getITypeVariables2() throws CompileException {return Collections.emptyList();}
+
                         @Override public boolean       isVarargs()            { return false;                                   }
                         @Override public List<IClass>      getThrownExceptions2() { return Collections.emptyList();                           }
                     }
