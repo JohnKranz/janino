@@ -371,6 +371,16 @@ class ReflectionIClass extends IClass {
             return parameterTypes;
         }
 
+        @Override
+        protected ITypeVariable[] getITypeVariables2() throws CompileException {
+            final TypeVariable<?>[] tps = this.constructor.getTypeParameters();
+
+            ITypeVariable[] result = new ITypeVariable[tps.length];
+            for (int i = 0; i < result.length; i++) result[i] = ReflectionIClass.this.typeVariableToITypeVariable(tps[i]);
+
+            return result;
+        }
+
         @Override public MethodDescriptor
         getDescriptor2() {
             Class<?>[] parameterTypes       = this.constructor.getParameterTypes();
@@ -414,6 +424,16 @@ class ReflectionIClass extends IClass {
 
         @Override public IClass[]
         getParameterTypes2() { return ReflectionIClass.this.classesToIClasses(this.method.getParameterTypes()); }
+
+        @Override
+        protected ITypeVariable[] getITypeVariables2() throws CompileException {
+            final TypeVariable<?>[] tps = this.method.getTypeParameters();
+
+            ITypeVariable[] result = new ITypeVariable[tps.length];
+            for (int i = 0; i < result.length; i++) result[i] = ReflectionIClass.this.typeVariableToITypeVariable(tps[i]);
+
+            return result;
+        }
 
         @Override public boolean
         isStatic() { return Modifier.isStatic(this.method.getModifiers()); }

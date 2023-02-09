@@ -49,7 +49,7 @@ import org.codehaus.commons.nullanalysis.Nullable;
  * </p>
  */
 public abstract
-class IClass implements ITypeVariableOrIClass {
+class IClass implements ITypeVariableOrIClass, IGenericDeclaration {
 
     private static final Logger LOGGER = Logger.getLogger(IClass.class.getName());
 
@@ -164,7 +164,7 @@ class IClass implements ITypeVariableOrIClass {
     /**
      * @return Zero-length array if this {@link IClass} declares no type variables
      */
-    public final ITypeVariable[]
+    @Override public final ITypeVariable[]
     getITypeVariables() throws CompileException {
         if (this.iTypeVariablesCache != null) return this.iTypeVariablesCache;
         return (this.iTypeVariablesCache = this.getITypeVariables2());
@@ -175,6 +175,16 @@ class IClass implements ITypeVariableOrIClass {
      * The uncached version of {@link #getDeclaredIConstructors()} which must be implemented by derived classes.
      */
     protected abstract ITypeVariable[] getITypeVariables2() throws CompileException;
+
+    @Override
+    public ITypeVariable findITypeVariable(String name) throws CompileException {
+        for(ITypeVariable itv : getITypeVariables()){
+            if(itv.getName().equals(name)) return itv;
+        }
+        if(getOuterIClass() != null)
+            return getOuterIClass().findITypeVariable(name);
+        return null;
+    }
 
     /**
      * Returns all the constructors declared by the class represented by the type. If the class has a default
@@ -889,7 +899,7 @@ class IClass implements ITypeVariableOrIClass {
      * Base class for {@link IConstructor} and {@link IMethod}.
      */
     public abstract
-    class IInvocable implements IMember {
+    class IInvocable implements IMember, IGenericDeclaration {
 
         private boolean argsNeedAdjust;
 
@@ -937,6 +947,23 @@ class IClass implements ITypeVariableOrIClass {
          */
         public abstract IClass[]
         getParameterTypes2() throws CompileException;
+
+
+        /**
+         * @return Zero-length array if this {@link IClass} declares no type variables
+         */
+        @Override public final ITypeVariable[]
+        getITypeVariables() throws CompileException {
+            if (this.iTypeVariablesCache != null) return this.iTypeVariablesCache;
+            return (this.iTypeVariablesCache = this.getITypeVariables2());
+        }
+        @Nullable private ITypeVariable[] iTypeVariablesCache;
+
+//        protected abstract ITypeVariable[] getITypeVariables2() throws CompileException;
+        protected ITypeVariable[] getITypeVariables2() throws CompileException {
+            return new ITypeVariable[0];
+        }
+
 
         /**
          * Returns the method descriptor of this constructor or method. This method is fast.
@@ -1110,6 +1137,14 @@ class IClass implements ITypeVariableOrIClass {
     public abstract
     class IConstructor extends IInvocable {
 
+        @Override
+        public ITypeVariable findITypeVariable(String name) throws CompileException {
+            for(ITypeVariable itv : getITypeVariables()){
+                if(itv.getName().equals(name)) return itv;
+            }
+            return getDeclaringIClass().findITypeVariable(name);
+        }
+
         @Override public MethodDescriptor
         getDescriptor2() throws CompileException {
 
@@ -1183,6 +1218,15 @@ class IClass implements ITypeVariableOrIClass {
          * @return The name of this method
          */
         public abstract String getName();
+
+        @Override
+        public ITypeVariable findITypeVariable(String name) throws CompileException {
+            for(ITypeVariable itv : getITypeVariables()){
+                if(itv.getName().equals(name)) return itv;
+            }
+            if(isStatic()) return null;
+            return getDeclaringIClass().findITypeVariable(name);
+        }
 
         @Override public MethodDescriptor
         getDescriptor2() throws CompileException {
