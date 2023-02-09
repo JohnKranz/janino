@@ -91,7 +91,7 @@ class ITypeVariable extends IClass {
 
         public ITypeVariable resolveGeneric(String name) throws CompileException {
             ITypeVariable itv = iTypeVariableMap.get(name);
-            if(itv== null) itv = igd.getDeclaringIClass().resolveGeneric(name);
+            if(itv == null) itv = igd.getDeclaringIClass().resolveGeneric(name);
             return itv;
         }
 
@@ -140,7 +140,7 @@ class ITypeVariable extends IClass {
 
     @Override
     public String getDescriptor() {
-        return null;
+        return superClass.getDescriptor();
     }
 
     @Override public boolean isFinal() {return false;}

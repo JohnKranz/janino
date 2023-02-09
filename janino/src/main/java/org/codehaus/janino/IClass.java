@@ -176,6 +176,12 @@ class IClass implements IGenericDeclaration {
 
     public IClass getParameterizedType(ITypeVariable itv){return itv;}
 
+    public IClass tryParameterize(IClass iClass){
+        if(iClass instanceof ITypeVariable)
+            return getParameterizedType((ITypeVariable) iClass);
+        return iClass;
+    }
+
     /**
      * Returns the superclass of the class.
      * <p>

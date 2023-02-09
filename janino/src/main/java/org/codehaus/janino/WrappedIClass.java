@@ -69,7 +69,5 @@ public class WrappedIClass extends IClass{
     @Override public boolean isFinal() {return wrappedClass.isFinal();}
 
 
-
     protected IClass wrappedClass;
-
 }

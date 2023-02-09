@@ -25,15 +25,24 @@
 
 package org.codehaus.janino;
 
+import org.codehaus.commons.compiler.CompileException;
+
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 public
 class IParameterizedType extends WrappedIClass {
 
-    protected Map<ITypeVariable,IClass> typeArgumentsMap;
+    protected Map<ITypeVariable,IClass> typeArgumentsMap = new HashMap<>();
 
-    public IParameterizedType(){
-
+    public IParameterizedType(IClass rawType,List<IClass> typeArguments) throws CompileException {
+        wrappedClass = rawType;
+        Iterator<ITypeVariable> tvs = rawType.getITypeVariables().iterator();
+        for(IClass ta : typeArguments){
+            if(tvs.hasNext()) typeArgumentsMap.put(tvs.next(),ta);
+        }
     }
 
     public IClass getRawType(){

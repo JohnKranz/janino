@@ -284,6 +284,7 @@ class UnitCompiler {
     UnitCompiler(AbstractCompilationUnit abstractCompilationUnit, IClassLoader iClassLoader) {
         this.abstractCompilationUnit = abstractCompilationUnit;
         this.iClassLoader            = iClassLoader;
+        this.typeStack               = new TargetTypeStack();
     }
 
     /**
@@ -6976,8 +6977,8 @@ class UnitCompiler {
         }
     }
 
-    @SuppressWarnings("unused") private IClass
-    typeArgumentToIType(TypeArgument ta) throws CompileException {
+    private IClass
+    typeArgumentToIClass(TypeArgument ta) throws CompileException {
 
         if (ta instanceof ReferenceType) {
             return this.getType((ReferenceType) ta);
@@ -6987,19 +6988,7 @@ class UnitCompiler {
             final IClass ub = w.bounds == Wildcard.BOUNDS_EXTENDS ? this.getType(w.referenceType) : UnitCompiler.this.iClassLoader.TYPE_java_lang_Object;
             final IClass lb = w.bounds == Wildcard.BOUNDS_SUPER   ? this.getType(w.referenceType) : null;
 
-            throw new CompileException("NYI",null);
-            /*return new IWildcardType() {
-                @Override public IClass           getUpperBound() { return ub; }
-                @Override @Nullable public IClass getLowerBound() { return lb; }
-
-                @Override public String
-                toString() {
-                    String s = "?";
-                    if (ub != UnitCompiler.this.iClassLoader.TYPE_java_lang_Object) s += " extends " + ub;
-                    if (lb != null) s += " super " + lb;
-                    return s;
-                }
-            };*/
+            return new IWildcardType(ub,lb);
         } else
         if (ta instanceof ArrayType) {
             // TODO
@@ -13675,6 +13664,8 @@ class UnitCompiler {
     private final AbstractCompilationUnit abstractCompilationUnit;
 
     private final IClassLoader iClassLoader;
+
+    private final TargetTypeStack typeStack;
 
     /**
      * Non-{@code null} while {@link #compileUnit(boolean, boolean, boolean, ClassFileConsumer)} is executing.

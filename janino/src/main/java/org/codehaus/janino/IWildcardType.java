@@ -28,15 +28,30 @@ package org.codehaus.janino;
 import org.codehaus.commons.nullanalysis.Nullable;
 
 public
-abstract class IWildcardType extends IClass {
+class IWildcardType extends WrappedIClass {
 
     /**
      * @return The type of the {@code extends} clause, or {@code Object.class}
      */
-    abstract IClass getUpperBound();
+    public IClass getUpperBound(){
+        return upperBound;
+    }
 
     /**
      * @return The type of the {@code super} clause, or {@code null}
      */
-    abstract @Nullable IClass getLowerBound();
+    @Nullable
+    public IClass getLowerBound(){
+        return lowerBound;
+    }
+
+    protected IClass upperBound;
+    protected IClass lowerBound;
+
+    public IWildcardType(IClass upperBound,IClass lowerBound){
+        this.upperBound = upperBound;
+        this.lowerBound = lowerBound;
+        this.wrappedClass = lowerBound == null ? upperBound : lowerBound;
+    }
+
 }

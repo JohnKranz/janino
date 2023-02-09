@@ -287,7 +287,7 @@ class ReflectionIClass extends CachedIClass {
         // Implement "IConstructor".
         @Override public List<IClass>
         getParameterTypes2() throws CompileException {
-            List<IClass> parameterTypes = ReflectionIClass.this.classesToIClasses(this.constructor.getParameterTypes());
+            List<IClass> parameterTypes = ReflectionIClass.this.typesToIClasses(ReflectionIClass.this, this.constructor.getGenericParameterTypes());
 
             // The JAVADOC of java.lang.reflect.Constructor does not document it, but "getParameterTypes()" includes
             // the synthetic "enclosing instance" parameter.
@@ -367,7 +367,13 @@ class ReflectionIClass extends CachedIClass {
         }
 
         @Override public List<IClass>
-        getParameterTypes2() { return ReflectionIClass.this.classesToIClasses(this.method.getParameterTypes()); }
+        getParameterTypes2() {
+            try {
+                return ReflectionIClass.this.typesToIClasses(ReflectionIMethod.this,this.method.getGenericParameterTypes());
+            } catch (CompileException e) {
+                throw new InternalCompilerException(e.getMessage());
+            }
+        }
 
         @Override
         public List<ITypeVariable> getITypeVariables2() throws CompileException {
@@ -410,7 +416,13 @@ class ReflectionIClass extends CachedIClass {
         isStatic() { return Modifier.isStatic(this.field.getModifiers()); }
 
         @Override public IClass
-        getType() { return ReflectionIClass.this.classToIClass(this.field.getType()); }
+        getType() {
+            try {
+                return ReflectionIClass.this.typeToIClass(ReflectionIClass.this,this.field.getGenericType());
+            } catch (CompileException e) {
+                throw new InternalCompilerException(e.getMessage());
+            }
+        }
 
         @Override public String
         toString() {
@@ -517,41 +529,58 @@ class ReflectionIClass extends CachedIClass {
     }
 
 
+    private List<IClass>
+    typesToIClasses(IGenericDeclaration igd,Type[] ts) throws CompileException {
+
+        List<IClass> result = new ArrayList<>();
+        for (Type type : ts) result.add(this.typeToIClass(igd,type));
+
+        return result;
+    }
+
+    private IClass typeToIClass(IGenericDeclaration igd,Type type) throws CompileException {
+        if (type instanceof Class) {
+            return classToIClass((Class<?>) type);
+        } else
+        if (type instanceof GenericArrayType) {
+            GenericArrayType genericArrayType = (GenericArrayType) type;
+            IClass resolved = typeToIClass(igd,genericArrayType.getGenericComponentType());
+            return iClassLoader.getArrayIClass(resolved);
+        } else
+        if (type instanceof ParameterizedType) {
+            ParameterizedType parameterizedType = (ParameterizedType) type;
+            return new IParameterizedType(
+                    typeToIClass(igd,parameterizedType.getRawType()),
+                    typesToIClasses(igd,parameterizedType.getActualTypeArguments()));
+        } else
+        if (type instanceof TypeVariable) {
+            TypeVariable<?> typeVariable = (TypeVariable<?>) type;
+            ITypeVariable itv = igd.resolveGeneric(typeVariable.getName());
+            if(itv == null) throw new CompileException("Impossible error.",null);
+            return itv;
+        } else
+        if (type instanceof WildcardType) {
+            WildcardType wildcardType = (WildcardType) type;
+            IClass upperBound = typeToIClass(igd,wildcardType.getUpperBounds()[0]);
+            IClass lowerBound = wildcardType.getLowerBounds().length == 0 ?
+                    iClassLoader.TYPE_java_lang_Object :
+                    typeToIClass(igd,wildcardType.getLowerBounds()[0]);
+
+            return new IWildcardType(upperBound, lowerBound);
+        } else
+        {
+            throw new AssertionError(type.getClass());
+        }
+    }
 
     private List<ITypeVariable> makeTypeVariables(IGenericDeclaration igd,List<TypeVariable<?>> tvs) throws CompileException {
         ITypeVariable.ITypeVariableMap<Type> itvm = new ITypeVariable.ITypeVariableMap<Type>(igd) {
             @Override
             public IClass reclassifyBoundType(Type type) throws CompileException {
-                if (type instanceof Class) {
-                    IClass iClass;
-                    try {
-                        iClass = iClassLoader.loadIClass(Descriptor.fromClassName(((Class<?>) type).getName()));
-                    } catch (ClassNotFoundException cnfe) {
-                        throw new CompileException("Loading \"" + type + "\"", null, cnfe);
-                    }
-                    if (iClass == null) throw new CompileException("Could not load \"" + type + "\"", null);
-                    return iClass;
-                } else
-                if (type instanceof GenericArrayType) {
-                    GenericArrayType genericArrayType = (GenericArrayType) type;
-                    IClass resolved = reclassifyBoundType(genericArrayType.getGenericComponentType());
-                    return iClassLoader.getArrayIClass(resolved);
-                } else
-                if (type instanceof ParameterizedType) {
-                    throw new AssertionError("NYI");
-                } else
-                if (type instanceof TypeVariable) {
-                    TypeVariable<?> typeVariable = (TypeVariable<?>) type;
-                    ITypeVariable itv = this.resolveGeneric(typeVariable.getName());
-                    if(itv == null) throw new CompileException("Impossible error.",null);
-                    return itv;
-                } else
-                if (type instanceof WildcardType) {
-                    throw new AssertionError("NYI");
-                } else
-                {
-                    throw new AssertionError(type.getClass());
-                }
+                if(type instanceof TypeVariable<?>)
+                    return resolveGeneric(((TypeVariable<?>) type).getName());
+
+                return typeToIClass(igd,type);
             }
         };
         for(TypeVariable<?> tv : tvs) itvm.addITypeVariable(tv.getName(), Arrays.asList(tv.getBounds()));
