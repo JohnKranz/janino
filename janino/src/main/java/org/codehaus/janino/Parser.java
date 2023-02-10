@@ -2649,7 +2649,7 @@ class Parser {
         if (this.peekRead("extends")) {
             List<ReferenceType> bound = new ArrayList<>();
             bound.add(this.parseReferenceType());
-            while (this.peekRead("&")) this.parseReferenceType();
+            while (this.peekRead("&")) bound.add(this.parseReferenceType());
             return new TypeParameter(name, (ReferenceType[]) bound.toArray(new ReferenceType[bound.size()]));
         }
         return new TypeParameter(name, null);

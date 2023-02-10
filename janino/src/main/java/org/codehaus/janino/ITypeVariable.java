@@ -52,8 +52,21 @@ class ITypeVariable extends IClass {
         return iGenericDeclaration;
     }
 
+    public IClass getRawType(){
+        return bounds.get(0);
+    }
+
     public String getName(){
         return name;
+    }
+
+    public String toSignature(){
+        StringBuilder sb = new StringBuilder(name);
+        for(IClass bound : bounds){
+            sb.append(':');
+            sb.append(bound.getDescriptor());
+        }
+        return sb.toString();
     }
 
     protected void applyBounds(List<IClass> bounds) throws CompileException{
@@ -99,17 +112,14 @@ class ITypeVariable extends IClass {
 
     @Override
     public String getDescriptor() {
-        return bounds.get(0).getDescriptor();
+        return 'T' + name + ';';
     }
 
+    @Override public String toString() {return name;}
+
+
     @Override public boolean isFinal() {return false;}
-
     @Override public boolean isInterface() {return false;}
-
-
-
-
-
 
 
     @Override public IClass getOuterIClass() throws CompileException {return null;}

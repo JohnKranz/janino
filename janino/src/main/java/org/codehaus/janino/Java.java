@@ -1122,7 +1122,7 @@ class Java {
                 for (TypeParameter tp : this.typeParameters) {
                     if (tp.bound != null) {
                         for (ReferenceType boundType : tp.bound) {
-                            boundType.setEnclosingScope(enclosingScope);
+                            boundType.setEnclosingScope(this);
                         }
                     }
                 }

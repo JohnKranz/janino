@@ -53,4 +53,18 @@ class IParameterizedType extends WrappedIClass {
     public IClass getTypeArgument(ITypeVariable itv) {
         return typeArgumentsMap.get(itv);
     }
+
+    @Override
+    public String getDescriptor() {
+        StringBuilder sb = new StringBuilder(
+                Descriptor.toInternalForm(super.getDescriptor()));
+
+        sb.append('<');
+        for(IClass ta : typeArgumentsMap.values()){
+            sb.append(ta.getDescriptor());
+        }
+        sb.append('>');
+
+        return Descriptor.fromInternalForm(sb.toString());
+    }
 }

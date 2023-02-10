@@ -89,7 +89,7 @@ class ClassFile implements Annotatable {
      * @see ClassFile#addMethodInfo(short, String, MethodDescriptor)
      */
     public
-    ClassFile(short accessFlags, String thisClassFd, @Nullable String superclassFd, String[] interfaceFds) {
+    ClassFile(short accessFlags, String thisClassFd, @Nullable String superclassFd, String[] interfaceFds, @Nullable String classSignature) {
 
         // Compute the .class file major and minor version.
         {
@@ -129,6 +129,21 @@ class ClassFile implements Annotatable {
         this.fieldInfos    = new ArrayList<>();
         this.methodInfos   = new ArrayList<>();
         this.attributes    = new ArrayList<>();
+
+        if(classSignature != null)
+            addClassSignatureAttribute(classSignature);
+    }
+
+    /**
+     * Adds a {@code Signature} attribute to this class file.
+     * @param classSignature Class signature string.
+     */
+    public void
+    addClassSignatureAttribute(String classSignature) {
+        this.attributes.add(new SignatureAttribute(
+                this.addConstantUtf8Info("Signature"),  // attributeNameIndex
+                this.addConstantUtf8Info(classSignature) // classSignatureIndex
+        ));
     }
 
     /**

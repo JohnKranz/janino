@@ -504,12 +504,11 @@ class UnitCompiler {
             for (IMethod base : ms) {
                 if (base.isAbstract()) {
                     if ("<clinit>".equals(base.getName())) continue;
-                    IMethod override = iClass.findIMethod(base.getName(), base.getParameterTypes());
-                    if (
-                        override == null           // It wasn't overridden
+                    IMethod override = iClass.findIMethod(base.getName(), base.getParameterTypes(iClass));
+                    if (override == null           // It wasn't overridden
                         || override.isAbstract()   // It was overridden with an abstract method
                                                    // The override does not provide a covariant return type
-                        || !base.getReturnType().isAssignableFrom(override.getReturnType())
+                        || !base.getReturnType(iClass).isAssignableFrom(override.getReturnType())
                     ) {
                         this.compileError(
                             "Non-abstract class \"" + iClass + "\" must implement method \"" + base + "\"",
@@ -1112,7 +1111,8 @@ class UnitCompiler {
             accessFlags,                                            // accessFlags
             iClass.getDescriptor(),                                 // thisClassFD
             superclass != null ? superclass.getDescriptor() : null, // superclassFD
-            IClass.getDescriptors(interfaces)                       // interfaceFDs
+            IClass.getDescriptors(interfaces),                       // interfaceFDs
+            iClass.toSignature()
         );
 
         int v = this.getTargetVersion();
@@ -1490,7 +1490,7 @@ class UnitCompiler {
         // Check whether it overrides a method declared in THIS type.
         List<IMethod> ms = type.getDeclaredIMethods(method.getName());
         for (IMethod m : ms) {
-            if (method.getParameterTypes().equals(m.getParameterTypes())) return true;
+            if (method.getParameterTypes().equals(m.getParameterTypes(type))) return true;
         }
 
         // Check whether it overrides a method declared in a supertype.
@@ -6703,6 +6703,7 @@ class UnitCompiler {
     private static IClass
     rawTypeOf(IClass iClass) {
         while (iClass instanceof IParameterizedType) iClass = ((IParameterizedType) iClass).getRawType();
+        while (iClass instanceof ITypeVariable) iClass = ((ITypeVariable) iClass).getRawType();
         return iClass;
     }
 
@@ -6934,44 +6935,25 @@ class UnitCompiler {
         // Type declaration type parameter?
         for (Scope s = scope; !(s instanceof CompilationUnit); s = s.getEnclosingScope()) {
             if (!(s instanceof NamedTypeDeclaration)) continue;
+
             NamedTypeDeclaration ntd = (NamedTypeDeclaration) s;
 
-            TypeParameter[] typeParameters = ntd.getOptionalTypeParameters();
-            if (typeParameters != null) {
-                for (TypeParameter tp : typeParameters) {
-                    if (tp.name.equals(simpleTypeName)) {
-                        IClass[]         boundTypes;
-                        ReferenceType[] ob = tp.bound;
-                        if (ob == null) {
-                            boundTypes = new IClass[] { this.iClassLoader.TYPE_java_lang_Object };
-                        } else {
-                            boundTypes = new IClass[ob.length];
-                            for (int i = 0; i < boundTypes.length; i++) {
-                                boundTypes[i] = this.getType(ob[i]);
-                            }
-                        }
-                        return boundTypes[0];
-                    }
-                }
-            }
+            IClass iClass = UnitCompiler.this.resolve(ntd);
+            ITypeVariable itv = iClass.findITypeVariable(simpleTypeName);
+
+            if(itv != null) return itv;
         }
 
-//        // Determine type arguments.
-//        IClass[] tas;
-//        {
-//            if (typeArguments == null) {
-//                tas = new IClass[0];
-//            } else {
-//                tas = new IClass[typeArguments.length];
-//                for (int i = 0; i < tas.length; i++) {
-//                    final TypeArgument ta = typeArguments[i];
-//                    tas[i] = this.typeArgumentToIType(ta);
-//                }
-//            }
-//        }
+        List<IClass> tas = new ArrayList<>();
+        if (typeArguments != null){
+            for (TypeArgument ta : typeArguments)
+                tas.add(this.typeArgumentToIClass(ta));
+        }
 
         try {
-            return this.getRawReferenceType(location, simpleTypeName, scope)/*.parameterize(tas)*/;
+            IClass rawType = this.getRawReferenceType(location, simpleTypeName, scope);
+            if(tas.size() > 0) return new IParameterizedType(rawType,tas);
+            return rawType;
         } catch (CompileException ce) {
             throw new CompileException(ce.getMessage(), location, ce);
         }
@@ -10158,8 +10140,9 @@ class UnitCompiler {
                         protected void reclassifyBounds() throws CompileException {
                             List<IClass> bounds = new ArrayList<>();
                             if (tp.bound != null) {
-                                for (ReferenceType r : tp.bound)
+                                for (ReferenceType r : tp.bound){
                                     bounds.add(UnitCompiler.this.getType(r));
+                                }
                             } else bounds.add(iClassLoader.TYPE_java_lang_Object);
                             applyBounds(bounds);
                         }
@@ -10398,7 +10381,7 @@ class UnitCompiler {
                     NamedClassDeclaration ncd = (NamedClassDeclaration) atd;
                     List<IClass>              res = new ArrayList<>();
                     for (int i = 0; i < ncd.implementedTypes.length; ++i) {
-                        res.add(UnitCompiler.this.getRawType(ncd.implementedTypes[i]));
+                        res.add(UnitCompiler.this.getType(ncd.implementedTypes[i]));
                         if (!res.get(i).isInterface()) {
                             UnitCompiler.this.compileError((
                                 "\""
@@ -10413,7 +10396,7 @@ class UnitCompiler {
                     InterfaceDeclaration id  = (InterfaceDeclaration) atd;
                     List<IClass>             res = new ArrayList<>();
                     for (int i = 0; i < id.extendedTypes.length; ++i) {
-                        res.add(UnitCompiler.this.getRawType(id.extendedTypes[i]));
+                        res.add(UnitCompiler.this.getType(id.extendedTypes[i]));
                         if (!res.get(i).isInterface()) {
                             UnitCompiler.this.compileError((
                                 "\""

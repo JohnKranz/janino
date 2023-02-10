@@ -168,8 +168,7 @@ class IClass implements IGenericDeclaration {
         for(ITypeVariable itv : getITypeVariables())
             if(itv.getName().equals(name)) return itv;
 
-        if(getOuterIClass() == null)
-            throw new CompileException("Generic type " + name + "not found.",null);
+        if(getOuterIClass() == null) return null;
 
         return getOuterIClass().findITypeVariable(name);
     }
@@ -189,6 +188,16 @@ class IClass implements IGenericDeclaration {
         return iClass;
     }
 
+    public List<IClass> getParameterized(List<IClass> types) throws CompileException {
+        List<IClass> parameterized = new ArrayList<>();
+        for(IClass type : types){
+            if(type instanceof ITypeVariable)
+                parameterized.add(getTypeArgument((ITypeVariable) type));
+            else parameterized.add(type);
+        }
+        return parameterized;
+    }
+
     private List<IParameterizedType> parameterizedTypesCache;
     protected List<IParameterizedType> getIParameterizedTypes() throws CompileException {
         if(parameterizedTypesCache != null) return parameterizedTypesCache;
@@ -198,7 +207,9 @@ class IClass implements IGenericDeclaration {
         if(this instanceof IParameterizedType)
             parameterizedTypes.add((IParameterizedType) this);
 
-        parameterizedTypes.addAll(getSuperclass().getIParameterizedTypes());
+        IClass superclass = getSuperclass();
+        if(superclass != null)
+            parameterizedTypes.addAll(superclass.getIParameterizedTypes());
 
         for(IClass i : getInterfaces())
             parameterizedTypes.addAll(i.getIParameterizedTypes());
@@ -479,6 +490,24 @@ class IClass implements IGenericDeclaration {
         String className = Descriptor.toClassName(this.getDescriptor());
         if (className.startsWith("java.lang.") && className.indexOf('.', 10) == -1) className = className.substring(10);
         return className;
+    }
+
+    public String toSignature() throws CompileException {
+        List<ITypeVariable> iTypeVariables = getITypeVariables();
+        if(iTypeVariables.isEmpty()) return null;
+        StringBuilder sb = new StringBuilder();
+
+        sb.append('<');
+        for(ITypeVariable itv : iTypeVariables)
+            sb.append(itv.toSignature());
+        sb.append('>');
+
+        sb.append(getSuperclass().getDescriptor());
+
+        for(IClass i : getInterfaces())
+            sb.append(i.getDescriptor());
+
+        return sb.toString();
     }
 
     /**
@@ -766,6 +795,15 @@ class IClass implements IGenericDeclaration {
         public abstract List<IClass>
         getParameterTypes2() throws CompileException;
 
+        /**
+         * Try to get parameter's type argument.
+         * @param parameterizedType type that may be parameterized.
+         * @return type arguments and non-generic types.
+         */
+        public List<IClass> getParameterTypes(IClass parameterizedType) throws CompileException {
+            if(parameterizedType == null) return getParameterTypes();
+            return parameterizedType.getParameterized(getParameterTypes());
+        }
 
         private List<ITypeVariable> iTypeVariablesCache;
         @Override public final
@@ -1033,6 +1071,16 @@ class IClass implements IGenericDeclaration {
         public abstract IClass getReturnType() throws CompileException;
 
         /**
+         * Try to get type argument.
+         * @param parameterizedType type that may be parameterized.
+         * @return type argument found or default return type.
+         */
+        public IClass getReturnType(IClass parameterizedType) throws CompileException {
+            if(parameterizedType == null) return getReturnType();
+            return parameterizedType.tryParameterize(getReturnType());
+        }
+
+        /**
          * @return The name of this method
          */
         public abstract String getName();
@@ -1056,12 +1104,16 @@ class IClass implements IGenericDeclaration {
 
         @Override public String
         toString() {
+            return toString(null);
+        }
+
+        public String toString(IClass type){
             StringBuilder sb = new StringBuilder();
             sb.append(this.getAccess().toString()).append(' ');
             if (this.isStatic()) sb.append("static ");
             if (this.isAbstract()) sb.append("abstract ");
             try {
-                sb.append(this.getReturnType().toString());
+                sb.append(this.getReturnType(type).toString());
             } catch (CompileException ex) {
                 sb.append("<invalid type>");
             }
@@ -1071,7 +1123,7 @@ class IClass implements IGenericDeclaration {
             sb.append(this.getName());
             sb.append('(');
             try {
-                List<IClass> parameterTypes = this.getParameterTypes();
+                List<IClass> parameterTypes = this.getParameterTypes(type);
                 for (int i = 0; i < parameterTypes.size(); ++i) {
                     if (i > 0) sb.append(", ");
                     sb.append(parameterTypes.get(i).toString());
