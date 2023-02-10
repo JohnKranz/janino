@@ -501,6 +501,7 @@ class UnitCompiler {
         // Check that all methods of the non-abstract class are implemented.
         if (!(cd instanceof NamedClassDeclaration && ((NamedClassDeclaration) cd).isAbstract())) {
             List<IMethod> ms = iClass.getIMethods();
+            System.out.println("Type : "+iClass.getClass().getName() + iClass);
             for (IMethod base : ms) {
                 if (base.isAbstract()) {
                     if ("<clinit>".equals(base.getName())) continue;
