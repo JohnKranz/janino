@@ -10152,17 +10152,18 @@ class UnitCompiler {
                 final Java.TypeParameter[] typeParameters = ntd.getOptionalTypeParameters();
                 if (typeParameters == null) return Collections.emptyList();
                 List<ITypeVariable> result = new ArrayList<>();
-                for (int i = 0; i < typeParameters.length; i++) {
-                    final TypeParameter tp = typeParameters[i];
-
-                    /*List<IClass> bounds = new ArrayList<>();
-                    if(tp.bound != null){
-                        for (ReferenceType r : tp.bound) {
-                            bounds.add(UnitCompiler.this.getType(r));
+                for (final TypeParameter tp : typeParameters) {
+                    result.add(new ITypeVariable(tp.name, this) {
+                        @Override
+                        protected void reclassifyBounds() throws CompileException {
+                            List<IClass> bounds = new ArrayList<>();
+                            if (tp.bound != null) {
+                                for (ReferenceType r : tp.bound)
+                                    bounds.add(UnitCompiler.this.getType(r));
+                            } else bounds.add(iClassLoader.TYPE_java_lang_Object);
+                            applyBounds(bounds);
                         }
-                    }*/
-
-                    result.add(new ITypeVariable(tp.name,this));
+                    });
                 }
                 return result;
             }

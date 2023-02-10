@@ -164,22 +164,46 @@ class IClass implements IGenericDeclaration {
     getITypeVariables() throws CompileException;
 
     @Override
-    public ITypeVariable resolveGeneric(String name) throws CompileException {
-        for(ITypeVariable itv : getITypeVariables()){
-            if(itv.getName().equals(name))
-                return itv;
-        }
-        if(getDeclaringIClass() == null)
+    public ITypeVariable findITypeVariable(String name) throws CompileException {
+        for(ITypeVariable itv : getITypeVariables())
+            if(itv.getName().equals(name)) return itv;
+
+        if(getOuterIClass() == null)
             throw new CompileException("Generic type " + name + "not found.",null);
-        return getDeclaringIClass().resolveGeneric(name);
+
+        return getOuterIClass().findITypeVariable(name);
     }
 
-    public IClass getParameterizedType(ITypeVariable itv){return itv;}
+    public IClass getTypeArgument(ITypeVariable itv) throws CompileException {
+        IClass typeArgument;
+        for(IParameterizedType ipt : getIParameterizedTypes()){
+            typeArgument = ipt.getTypeArgument(itv);
+            if(typeArgument != null) return typeArgument;
+        }
+        return itv;
+    }
 
-    public IClass tryParameterize(IClass iClass){
+    public IClass tryParameterize(IClass iClass) throws CompileException {
         if(iClass instanceof ITypeVariable)
-            return getParameterizedType((ITypeVariable) iClass);
+            return getTypeArgument((ITypeVariable) iClass);
         return iClass;
+    }
+
+    private List<IParameterizedType> parameterizedTypesCache;
+    protected List<IParameterizedType> getIParameterizedTypes() throws CompileException {
+        if(parameterizedTypesCache != null) return parameterizedTypesCache;
+
+        List<IParameterizedType> parameterizedTypes = new ArrayList<>();
+
+        if(this instanceof IParameterizedType)
+            parameterizedTypes.add((IParameterizedType) this);
+
+        parameterizedTypes.addAll(getSuperclass().getIParameterizedTypes());
+
+        for(IClass i : getInterfaces())
+            parameterizedTypes.addAll(i.getIParameterizedTypes());
+
+        return (parameterizedTypesCache = parameterizedTypes);
     }
 
     /**
@@ -747,7 +771,10 @@ class IClass implements IGenericDeclaration {
         @Override public final
         List<ITypeVariable> getITypeVariables() throws CompileException {
             if(iTypeVariablesCache != null) return iTypeVariablesCache;
-            return (iTypeVariablesCache = getITypeVariables2());
+            iTypeVariablesCache = getITypeVariables2();
+            for(ITypeVariable itv : iTypeVariablesCache)
+                itv.reclassifyBounds();
+            return iTypeVariablesCache;
         }
 
         /**
@@ -755,15 +782,6 @@ class IClass implements IGenericDeclaration {
          */
         public abstract
         List<ITypeVariable> getITypeVariables2() throws CompileException;
-
-        @Override
-        public ITypeVariable resolveGeneric(String name) throws CompileException {
-            for(ITypeVariable itv : getITypeVariables()){
-                if(itv.getName().equals(name))
-                    return itv;
-            }
-            return getDeclaringIClass().resolveGeneric(name);
-        }
 
         /**
          * Returns the method descriptor of this constructor or method. This method is fast.
@@ -967,6 +985,14 @@ class IClass implements IGenericDeclaration {
             return new MethodDescriptor(Descriptor.VOID, parameterFds);
         }
 
+        @Override
+        public ITypeVariable findITypeVariable(String name) throws CompileException {
+            for(ITypeVariable itv : getITypeVariables()){
+                if(itv.getName().equals(name)) return itv;
+            }
+            return getDeclaringIClass().findITypeVariable(name);
+        }
+
         @Override public String
         toString() {
             StringBuilder sb = new StringBuilder(this.getDeclaringIClass().toString());
@@ -1017,6 +1043,15 @@ class IClass implements IGenericDeclaration {
                 this.getReturnType().getDescriptor(),
                 IClass.getDescriptors(this.getParameterTypes())
             );
+        }
+
+        @Override
+        public ITypeVariable findITypeVariable(String name) throws CompileException {
+            for(ITypeVariable itv : getITypeVariables()){
+                if(itv.getName().equals(name)) return itv;
+            }
+            if(isStatic()) return null;
+            return getDeclaringIClass().findITypeVariable(name);
         }
 
         @Override public String

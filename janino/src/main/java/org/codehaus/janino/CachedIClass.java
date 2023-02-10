@@ -14,10 +14,13 @@ public abstract class CachedIClass extends IClass{
     @Override
     public final List<ITypeVariable>
     getITypeVariables() throws CompileException {
-        if (this.iClassVariablesCache != null) return this.iClassVariablesCache;
-        return (this.iClassVariablesCache = this.getITypeVariables2());
+        if (this.iTypeVariablesCache != null) return this.iTypeVariablesCache;
+        this.iTypeVariablesCache = this.getITypeVariables2();
+        for(ITypeVariable itv : iTypeVariablesCache)
+            itv.reclassifyBounds();
+        return iTypeVariablesCache;
     }
-    @Nullable private List<ITypeVariable> iClassVariablesCache;
+    @Nullable private List<ITypeVariable> iTypeVariablesCache;
 
     /**
      * The uncached version of {@link #getDeclaredIConstructors()} which must be implemented by derived classes.

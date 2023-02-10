@@ -63,7 +63,11 @@ class ReflectionIClass extends CachedIClass {
 
     @Override public List<ITypeVariable>
     getITypeVariables2() throws CompileException {
-        return makeTypeVariables(this, Arrays.asList(clazz.getTypeParameters()));
+        List<ITypeVariable> result = new ArrayList<>();
+        for(TypeVariable<?> tv : clazz.getTypeParameters()){
+            result.add(new ReflectionITypeVariable(tv,this));
+        }
+        return result;
     }
 
     @Override protected List<IConstructor>
@@ -322,7 +326,11 @@ class ReflectionIClass extends CachedIClass {
 
         @Override
         public List<ITypeVariable> getITypeVariables2() throws CompileException {
-            return makeTypeVariables(this, Arrays.asList(constructor.getTypeParameters()));
+            List<ITypeVariable> result = new ArrayList<>();
+            for(TypeVariable<?> tv : constructor.getTypeParameters()){
+                result.add(new ReflectionITypeVariable(tv,ReflectionIConstructor.this));
+            }
+            return result;
         }
 
         @Override public MethodDescriptor
@@ -377,7 +385,11 @@ class ReflectionIClass extends CachedIClass {
 
         @Override
         public List<ITypeVariable> getITypeVariables2() throws CompileException {
-            return makeTypeVariables(this, Arrays.asList(method.getTypeParameters()));
+            List<ITypeVariable> result = new ArrayList<>();
+            for(TypeVariable<?> tv : method.getTypeParameters()){
+                result.add(new ReflectionITypeVariable(tv,ReflectionIMethod.this));
+            }
+            return result;
         }
 
         @Override public boolean
@@ -555,7 +567,7 @@ class ReflectionIClass extends CachedIClass {
         } else
         if (type instanceof TypeVariable) {
             TypeVariable<?> typeVariable = (TypeVariable<?>) type;
-            ITypeVariable itv = igd.resolveGeneric(typeVariable.getName());
+            ITypeVariable itv = igd.findITypeVariable(typeVariable.getName());
             if(itv == null) throw new CompileException("Impossible error.",null);
             return itv;
         } else
@@ -573,18 +585,19 @@ class ReflectionIClass extends CachedIClass {
         }
     }
 
-    private List<ITypeVariable> makeTypeVariables(IGenericDeclaration igd,List<TypeVariable<?>> tvs) throws CompileException {
-        ITypeVariable.ITypeVariableMap<Type> itvm = new ITypeVariable.ITypeVariableMap<Type>(igd) {
-            @Override
-            public IClass reclassifyBoundType(Type type) throws CompileException {
-                if(type instanceof TypeVariable<?>)
-                    return resolveGeneric(((TypeVariable<?>) type).getName());
+    class ReflectionITypeVariable extends ITypeVariable{
+        protected TypeVariable<?> typeVariable;
+        public ReflectionITypeVariable(TypeVariable<?> typeVariable, IGenericDeclaration iGenericDeclaration) {
+            super(typeVariable.getName(), iGenericDeclaration);
+            this.typeVariable = typeVariable;
+        }
 
-                return typeToIClass(igd,type);
-            }
-        };
-        for(TypeVariable<?> tv : tvs) itvm.addITypeVariable(tv.getName(), Arrays.asList(tv.getBounds()));
-        return itvm.apply(iClassLoader);
+        @Override
+        protected void reclassifyBounds() throws CompileException {
+            List<IClass> bounds = typesToIClasses(iGenericDeclaration,typeVariable.getBounds());
+            if(bounds.get(0).isInterface()) bounds.add(0,iClassLoader.TYPE_java_lang_Object);
+            applyBounds(bounds);
+        }
     }
 
 }

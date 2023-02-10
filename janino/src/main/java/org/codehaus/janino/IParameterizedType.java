@@ -50,7 +50,7 @@ class IParameterizedType extends WrappedIClass {
     }
 
     @Override
-    public IClass getParameterizedType(ITypeVariable itv) {
+    public IClass getTypeArgument(ITypeVariable itv) {
         return typeArgumentsMap.get(itv);
     }
 }

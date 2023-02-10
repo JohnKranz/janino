@@ -34,25 +34,18 @@ import java.util.*;
  * Type bounds can either be a class or interface type, or a type variable. Example: {@code MySet<K extends
  * Comparable & T>}
  */
-public
+public abstract
 class ITypeVariable extends IClass {
 
     protected String name;
-    protected IClass superClass;
-    protected List<IClass> interfaces = new ArrayList<>();
     protected IGenericDeclaration iGenericDeclaration;
-    protected IClass declaringIClass;
+    protected List<IClass> bounds;
+
+    protected List<IClass> interfaces = new ArrayList<>();
 
     public ITypeVariable(String name, IGenericDeclaration iGenericDeclaration){
         this.name = name;
         this.iGenericDeclaration = iGenericDeclaration;
-    }
-
-    @Override
-    public IClass getDeclaringIClass() throws CompileException {
-        if(iGenericDeclaration instanceof IClass)
-            return (IClass) iGenericDeclaration;
-        return iGenericDeclaration.getDeclaringIClass();
     }
 
     public IGenericDeclaration getIGenericDeclaration() {
@@ -63,55 +56,21 @@ class ITypeVariable extends IClass {
         return name;
     }
 
-    protected void setBounds(IClassLoader iClassLoader,List<IClass> bounds) throws CompileException{
+    protected void applyBounds(List<IClass> bounds) throws CompileException{
+        this.bounds = bounds;
+        boolean skip = true;
         for(IClass clz : bounds){
-            if(superClass == null){
-                if(clz.isInterface())
-                    superClass = iClassLoader.TYPE_java_lang_Object;
-                else superClass = clz;
-            }else if(clz.isInterface()){
+            if(skip){
+                skip = false;
+                continue;
+            }
+            if(clz.isInterface()){
                 interfaces.add(clz);
             }else throw new CompileException("Bound type should be interface here.",null);
         }
     }
 
-    public static abstract class ITypeVariableMap<T>{
-        protected Map<String,ITypeVariable> iTypeVariableMap = new HashMap<>();
-        protected Map<String,List<T>> iBoundDataMap = new HashMap<>();
-        protected IGenericDeclaration igd;
-        public ITypeVariableMap(IGenericDeclaration igd){
-            this.igd = igd;
-        }
-
-        public void addITypeVariable(String name,List<T> boundsData){
-            if(iTypeVariableMap.containsKey(name)) throw new InternalCompilerException("Duplicated type parameter "+name);
-            iTypeVariableMap.put(name,new ITypeVariable(name,igd));
-            iBoundDataMap.put(name,boundsData);
-        }
-
-        public ITypeVariable resolveGeneric(String name) throws CompileException {
-            ITypeVariable itv = iTypeVariableMap.get(name);
-            if(itv == null) itv = igd.getDeclaringIClass().resolveGeneric(name);
-            return itv;
-        }
-
-        public abstract IClass reclassifyBoundType(T typeData) throws CompileException ;
-
-        public List<ITypeVariable> apply(IClassLoader iClassLoader) throws CompileException {
-            for(String name : iBoundDataMap.keySet()){
-                List<IClass> bounds = new ArrayList<>();
-                for(T data : iBoundDataMap.get(name)){
-                    bounds.add(reclassifyBoundType(data));
-                }
-                iTypeVariableMap.get(name).setBounds(iClassLoader,bounds);
-            }
-            return new ArrayList<>(iTypeVariableMap.values());
-        }
-    }
-
-
-
-
+    protected abstract void reclassifyBounds() throws CompileException;
 
     @Override
     public List<ITypeVariable> getITypeVariables() throws CompileException {
@@ -120,7 +79,7 @@ class ITypeVariable extends IClass {
 
     @Override
     public IClass getSuperclass() throws CompileException {
-        return superClass;
+        return bounds.get(0);
     }
 
     @Override
@@ -140,7 +99,7 @@ class ITypeVariable extends IClass {
 
     @Override
     public String getDescriptor() {
-        return superClass.getDescriptor();
+        return bounds.get(0).getDescriptor();
     }
 
     @Override public boolean isFinal() {return false;}
@@ -153,16 +112,9 @@ class ITypeVariable extends IClass {
 
 
 
-
-
-    @Override
-    public IClass getOuterIClass() throws CompileException {
-        return null;
-    }
-
+    @Override public IClass getOuterIClass() throws CompileException {return null;}
+    @Override public IClass getDeclaringIClass() throws CompileException {return null;}
     @Override public List<IClass> getDeclaredIClasses() throws CompileException {return Collections.emptyList();}
-
-
     @Override public List<IField> getDeclaredIFields() {return Collections.emptyList();}
     @Override public List<IMethod> getDeclaredIMethods() {return NO_IMETHODS;}
     @Override public List<IConstructor> getDeclaredIConstructors() {return Collections.emptyList();}

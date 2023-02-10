@@ -124,8 +124,12 @@ class ClassFileIClass extends CachedIClass {
         List<ITypeVariable> result = new ArrayList<>();
         for (int i = 0; i < cs.formalTypeParameters.size(); i++) {
             final FormalTypeParameter     ftp    = (FormalTypeParameter) cs.formalTypeParameters.get(i);
-            final List<IClass> bounds = ClassFileIClass.this.getBounds(ftp);
             result.add(new ITypeVariable(ftp.identifier,this) {
+                @Override
+                protected void reclassifyBounds() throws CompileException {
+                    applyBounds(ClassFileIClass.this.getBounds(ftp));
+                }
+
                 @Override public String
                 toString() {
                     String                  s  = name + " extends " + bounds.get(0);
@@ -174,7 +178,7 @@ class ClassFileIClass extends CachedIClass {
                 @Override public IClass
                 visitTypeVariableSignature(final TypeVariableSignature tvs) {
                     try {
-                        return resolveGeneric(tvs.identifier);
+                        return findITypeVariable(tvs.identifier);
                     } catch (CompileException e) {
                         throw new InternalCompilerException(e.getMessage());
                     }
